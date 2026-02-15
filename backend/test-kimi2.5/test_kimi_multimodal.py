@@ -6,6 +6,14 @@ import json
 import base64
 import requests
 from openai import OpenAI
+try:
+    import dashscope
+    from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult
+except ImportError:
+    dashscope = None
+    # 定义虚拟类以防 ImportError 时后续代码报错
+    class RecognitionCallback: pass
+    class RecognitionResult: pass
 
 # 尝试导入生成文件的库，如果不存在则在生成时跳过
 try:
@@ -26,9 +34,12 @@ except ImportError:
 # -----------------------------------------------------------------------------
 # 配置区域
 # -----------------------------------------------------------------------------
-# 请设置环境变量 MOONSHOT_API_KEY，或者直接在此处填入您的 API Key
-API_KEY = "sk-a62knARhMuUNiGsBSEnumZ2BZt2AVo8NzeI8CbybsELV3Rs9"
-BASE_URL = "https://api.moonshot.cn/v1"
+# 请设置环境变量 MOONSHOT_MOONSHOT_API_KEY，或者直接在此处填入您的 API Key
+MOONSHOT_API_KEY = "sk-a62knARhMuUNiGsBSEnumZ2BZt2AVo8NzeI8CbybsELV3Rs9"
+MOONSHOT_BASE_URL = "https://api.moonshot.cn/v1"
+
+DASHSCOPE_API_KEY = "sk-c4383b80d4ce4bd1a20feefa5b9e9a6f"
+
 
 # 用户指定的模型名称
 MODEL_NAME = "kimi-k2.5"
@@ -36,15 +47,20 @@ MODEL_NAME = "kimi-k2.5"
 # -----------------------------------------------------------------------------
 # 初始化客户端
 # -----------------------------------------------------------------------------
-if API_KEY == "":
-    print("请先设置环境变量 MOONSHOT_API_KEY 或在代码中填入您的 API Key。")
+if DASHSCOPE_API_KEY == "":
+    print("请先设置环境变量 DASHSCOPE_API_KEY 或在代码中填入您的 API Key。")
     # 为了演示方便，我们允许脚本继续运行，但 API 调用会失败
     pass
 
+if not MOONSHOT_API_KEY:
+        print("请先设置环境变量 MOONSHOT_API_KEY 或在代码中填入您的 API Key。")
+        # 为了演示方便，我们允许脚本继续运行，但 API 调用会失败
+        pass
+
 try:
     client = OpenAI(
-        api_key=API_KEY,
-        base_url=BASE_URL,
+        api_key=MOONSHOT_API_KEY,
+        base_url=MOONSHOT_BASE_URL,
     )
 except Exception as e:
     print(f"初始化 OpenAI 客户端失败: {e}")
@@ -331,67 +347,195 @@ def test_file_understanding(file_path):
     except Exception as e:
         print(f"\n[测试结果]: 文件理解失败 ❌\n错误信息: {e}")
 
-def test_video_understanding_simulated():
+def test_video_understanding_real(video_file_path):
     """
-    测试视频理解 (Video Understanding) - 模拟
-    由于 API 暂不支持直接上传视频流，通常采用“关键帧提取”方案。
-    这里模拟发送 3 帧图片给 Kimi，让它理解“视频”内容。
+    测试视频理解 (Video Understanding) - 使用 Kimi k2.5 上传视频
+    步骤: 上传视频文件 -> 获取 file_id -> 构造 video_url (ms://<file_id>) -> 发送给 Kimi
     """
     print("\n" + "="*50)
-    print("开始测试：视频理解 (Video Understanding - 模拟)")
+    print("开始测试：视频理解 (Kimi k2.5 Video Upload)")
     print("="*50)
-    print("说明: Kimi API 目前主要通过由视频提取的关键帧(图片)来理解视频内容。")
 
-    # 模拟视频的三帧（使用公开图片 URL）
-    frames = [
-        "https://images.unsplash.com/photo-1518791841217-8f162f1e1131", # 猫
-        "https://images.unsplash.com/photo-1518791841217-8f162f1e1131", # 猫 (假设没动)
-        "https://images.unsplash.com/photo-1518791841217-8f162f1e1131", # 猫
-    ]
-    
-    print(f"正在发送 {len(frames)} 帧图片以模拟视频...")
-
-    content_list = [{"type": "text", "text": "这是一段视频的关键帧，请描述视频里发生了什么？"}]
-    for url in frames:
-        b64_img = encode_image_to_base64(url)
-        if b64_img:
-            content_list.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
-            })
-    
-    if len(content_list) <= 1:
-        print("❌ 无法获取任何视频帧图片，跳过测试")
+    if not os.path.exists(video_file_path):
+        print(f"❌ 视频文件不存在: {video_file_path}")
         return
 
     try:
+        # 1. 上传视频文件
+        print(f"1. 正在上传视频文件: {video_file_path} ...")
+        
+        with open(video_file_path, "rb") as f:
+            file_object = client.files.create(
+                file=f,
+                purpose="video" 
+            )
+        file_id = file_object.id
+        print(f"   视频上传成功，ID: {file_id}")
+
+        # 2. 构造请求
+        # 格式: type="video_url", video_url={"url": "ms://file_id"}
+        print("2. 发送给 Kimi 进行视频理解...")
+        
+        # 官方文档示例结构
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "video_url", "video_url": {"url": f"ms://{file_id}"}},
+                    {"type": "text", "text": "请描述这个视频的内容。"}
+                ]
+            }
+        ]
+
+        # 必须使用支持 Vision 的模型，如 kimi-k2.5
+        # 注意: message.content 字段类型为 List[Dict]
         response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "user", "content": content_list}
-            ],
+            model=MODEL_NAME, 
+            messages=messages,
         )
+        
         print("\n[Kimi 回复]:")
         print(response.choices[0].message.content)
-        print("\n[测试结果]: 视频理解(模拟)成功 ✅")
-    except Exception as e:
-        print(f"\n[测试结果]: 视频理解(模拟)失败 ❌\n错误信息: {e}")
+        print("\n[测试结果]: 视频理解(上传方式)成功 ✅")
 
-def test_audio_understanding_simulated():
+    except Exception as e:
+        print(f"\n[测试结果]: 视频理解(上传方式)失败 ❌\n错误信息: {e}")
+
+
+class AliyunASRCallback(RecognitionCallback):
+    def __init__(self):
+        self.transcribed_text = ""
+
+    def on_open(self) -> None:
+        print("   [Aliyun ASR] 连接建立")
+
+    def on_close(self) -> None:
+        print("   [Aliyun ASR] 连接关闭")
+
+    def on_complete(self) -> None:
+        print("   [Aliyun ASR] 识别完成")
+
+    def on_error(self, result: RecognitionResult) -> None:
+        print(f"   [Aliyun ASR] 错误: {result}")
+
+    def on_event(self, result: RecognitionResult) -> None:
+        sentence = result.get_sentence()
+        if 'text' in sentence:
+            text = sentence['text']
+            if result.is_sentence_end(sentence):
+                print(f"   [Aliyun ASR] 识别结果: {text}")
+                self.transcribed_text += text
+
+def test_audio_understanding_aliyun(audio_file_path):
     """
-    测试音频理解 (Audio Understanding) - 模拟
-    通常需要先使用 ASR (如 Whisper) 转录为文本。
+    测试音频理解 (Audio Understanding) - 使用阿里云 DashScope FunASR
+    步骤: 音频文件 -> Aliyun FunASR -> 文本 -> Kimi
     """
     print("\n" + "="*50)
-    print("开始测试：音频理解 (Audio Understanding - 模拟)")
+    print("开始测试：音频理解 (Aliyun FunASR + Kimi)")
     print("="*50)
-    print("说明: Kimi API 通常需要配合 ASR (语音转文字) 服务使用。")
-    print("步骤: 音频 -> ASR -> 文本 -> Kimi")
+    
+    # 检查 DashScope 库
+    if not dashscope:
+        print("❌ 未安装 dashscope 库，跳过测试。请运行: pip install dashscope")
+        return
 
-    # 模拟 ASR 转录结果
-    simulated_transcript = "这是一个测试音频的转录内容。Kimi 你好，请问今天天气怎么样？"
-    print(f"模拟音频转录文本: {simulated_transcript}")
+    # 检查 API Key
+    if not DASHSCOPE_API_KEY:
+        print("⚠️  未检测到 DASHSCOPE_API_KEY 环境变量。")
+        print("   请设置 DASHSCOPE_API_KEY 以使用阿里云语音识别服务。")
+        print("   本次测试将跳过实际 ASR 调用，仅做提示。")
+        return
+    
+    dashscope.api_key = DASHSCOPE_API_KEY
+    
+    # 检查音频文件
+    if not os.path.exists(audio_file_path):
+        print(f"❌ 音频文件不存在: {audio_file_path}")
+        # 尝试生成一个
+        try:
+            # 简单的生成逻辑，或者直接提示用户
+            print("   (提示: 请确保目录下存在有效的音频文件，例如 test_audio.wav)")
+        except:
+            pass
+        return
 
+    print(f"正在处理音频文件: {audio_file_path}")
+    print("1. 调用阿里云 FunASR 进行语音转文字...")
+
+    callback = AliyunASRCallback()
+    
+    # 使用 fun-asr-realtime-v1 模型 (或者 paraformer-realtime-v1)
+    # 注意: 阿里云推荐实时语音使用 paraformer-realtime-v1
+    # 官方文档中提到的 fun-asr-realtime 也可用
+    recognition = Recognition(
+        model='paraformer-realtime-v1', # 推荐模型
+        format='pcm', # 假设是 PCM 或者 wav (SDK会自动处理部分格式，但最好是 PCM/WAV)
+        # 如果是 wav 文件，SDK 通常可以处理，但最好指定 sample_rate
+        sample_rate=16000, 
+        callback=callback
+    )
+
+    recognition.start()
+
+    # 读取并发送音频数据
+    # 注意: 这里的实现是模拟实时流，将文件分块发送
+    try:
+        # 尝试使用 soundfile 或 wave 读取
+        # 这里为了简单，假设是 wav/pcm 16k mono
+        # 如果是 wav，需要跳过 header 或者直接读取 data
+        import wave
+        with wave.open(audio_file_path, 'rb') as wf:
+            # 检查参数
+            channels = wf.getnchannels()
+            rate = wf.getframerate()
+            if rate != 16000:
+                print(f"⚠️  警告: 音频采样率是 {rate}，模型通常需要 16000。可能会识别失败。")
+            
+            chunk_size = 3200 # 100ms for 16k
+            # 简单重采样逻辑：如果采样率是 44100，每隔 n 个点取一个，或者使用 audioop
+            # 为了更好的效果，建议使用 audioop 进行降采样
+            
+            data = wf.readframes(chunk_size)
+            while len(data) > 0:
+                # 如果采样率不匹配，尝试转换 (仅支持简单的降采样，例如 48k->16k, 32k->16k)
+                # 44.1k -> 16k 比较复杂，这里简单处理，如果需要高质量建议用 ffmpeg 预处理
+                if rate != 16000:
+                    try:
+                        # 简单的降采样：每隔 step 取一个点
+                        step = rate // 16000
+                        if step > 1:
+                            # 假设是 16bit PCM (2 bytes per sample)
+                            import struct
+                            num_samples = len(data) // 2
+                            if num_samples > 0:
+                                samples = struct.unpack(f"{num_samples}h", data)
+                                resampled_samples = samples[::step]
+                                data = struct.pack(f"{len(resampled_samples)}h", *resampled_samples)
+                    except Exception:
+                        pass # 转换失败则发送原始数据
+
+                recognition.send_audio_frame(data)
+                # 模拟实时发送的间隔 (可选)
+                time.sleep(0.01) 
+                data = wf.readframes(chunk_size)
+        
+        recognition.stop()
+    except Exception as e:
+        print(f"❌ 发送音频数据失败: {e}")
+        recognition.stop()
+        return
+
+    transcribed_text = callback.transcribed_text
+    print(f"\n   ASR 转录结果: {transcribed_text}")
+    
+    if not transcribed_text:
+        print("⚠️  未能识别出文本 (可能是音频为空或格式不支持)。")
+        # 为了流程继续，使用默认文本 (如果用户同意)
+        # transcribed_text = "这是测试文本"
+        return
+
+    print("2. 发送转录文本给 Kimi...")
     try:
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -402,21 +546,130 @@ def test_audio_understanding_simulated():
                 },
                 {
                     "role": "user",
-                    "content": simulated_transcript
+                    "content": transcribed_text
                 }
             ],
         )
         print("\n[Kimi 回复]:")
         print(response.choices[0].message.content)
-        print("\n[测试结果]: 音频理解(模拟)成功 ✅")
+        print("\n[测试结果]: 音频理解(Aliyun ASR)成功 ✅")
     except Exception as e:
-        print(f"\n[测试结果]: 音频理解(模拟)失败 ❌\n错误信息: {e}")
+        print(f"\n[测试结果]: 音频理解(Aliyun ASR)失败 ❌\n错误信息: {e}")
 
+def test_audio_understanding():
+    """
+    测试音频理解 (Audio Understanding) - 使用阿里云 DashScope FunASR
+    步骤: 音频文件 -> Aliyun FunASR -> 文本 -> Kimi
+    """
+    print("\n" + "="*50)
+    print("开始测试：音频理解 (Aliyun FunASR + Kimi)")
+    print("="*50)
+    
+    # 检查 DashScope 库
+    if not dashscope:
+        print("❌ 未安装 dashscope 库，跳过测试。请运行: pip install dashscope")
+        return
+
+    # 检查 API Key
+    if not DASHSCOPE_API_KEY:
+        print("⚠️  未检测到 DASHSCOPE_API_KEY 环境变量。")
+        print("   请设置 DASHSCOPE_API_KEY 以使用阿里云语音识别服务。")
+        print("   本次测试将跳过实际 ASR 调用，仅做提示。")
+        return
+    
+    dashscope.api_key = DASHSCOPE_API_KEY
+    
+    # 检查音频文件
+    if not os.path.exists(audio_file_path):
+        print(f"❌ 音频文件不存在: {audio_file_path}")
+        # 尝试生成一个
+        try:
+            # 简单的生成逻辑，或者直接提示用户
+            print("   (提示: 请确保目录下存在有效的音频文件，例如 test_audio.wav)")
+        except:
+            pass
+        return
+
+    print(f"正在处理音频文件: {audio_file_path}")
+    print("1. 调用阿里云 FunASR 进行语音转文字...")
+
+    callback = AliyunASRCallback()
+    
+    # 使用 fun-asr-realtime-v1 模型 (或者 paraformer-realtime-v1)
+    # 注意: 阿里云推荐实时语音使用 paraformer-realtime-v1
+    # 官方文档中提到的 fun-asr-realtime 也可用
+    recognition = Recognition(
+        model='paraformer-realtime-v1', # 推荐模型
+        format='pcm', # 假设是 PCM 或者 wav (SDK会自动处理部分格式，但最好是 PCM/WAV)
+        # 如果是 wav 文件，SDK 通常可以处理，但最好指定 sample_rate
+        sample_rate=16000, 
+        callback=callback
+    )
+
+    recognition.start()
+
+    # 读取并发送音频数据
+    # 注意: 这里的实现是模拟实时流，将文件分块发送
+    try:
+        # 尝试使用 soundfile 或 wave 读取
+        # 这里为了简单，假设是 wav/pcm 16k mono
+        # 如果是 wav，需要跳过 header 或者直接读取 data
+        import wave
+        with wave.open(audio_file_path, 'rb') as wf:
+            # 检查参数
+            channels = wf.getnchannels()
+            rate = wf.getframerate()
+            if rate != 16000:
+                print(f"⚠️  警告: 音频采样率是 {rate}，模型通常需要 16000。可能会识别失败。")
+            
+            chunk_size = 3200 # 100ms for 16k
+            data = wf.readframes(chunk_size)
+            while len(data) > 0:
+                recognition.send_audio_frame(data)
+                # 模拟实时发送的间隔 (可选)
+                time.sleep(0.01) 
+                data = wf.readframes(chunk_size)
+        
+        recognition.stop()
+    except Exception as e:
+        print(f"❌ 发送音频数据失败: {e}")
+        recognition.stop()
+        return
+
+    transcribed_text = callback.transcribed_text
+    print(f"\n   ASR 转录结果: {transcribed_text}")
+    
+    if not transcribed_text:
+        print("⚠️  未能识别出文本 (可能是音频为空或格式不支持)。")
+        # 为了流程继续，使用默认文本 (如果用户同意)
+        # transcribed_text = "这是测试文本"
+        return
+
+    print("2. 发送转录文本给 Kimi...")
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一个语音助手，请根据用户的语音转录内容进行回复。"
+                },
+                {
+                    "role": "user",
+                    "content": transcribed_text
+                }
+            ],
+        )
+        print("\n[Kimi 回复]:")
+        print(response.choices[0].message.content)
+        print("\n[测试结果]: 音频理解(Aliyun ASR)成功 ✅")
+    except Exception as e:
+        print(f"\n[测试结果]: 音频理解(Aliyun ASR)失败 ❌\n错误信息: {e}")
 
 def main():
     print("Moonshot AI (Kimi) 多模态 API 测试脚本")
     print(f"当前使用的模型: {MODEL_NAME}")
-    print("注意: 请确保已设置 MOONSHOT_API_KEY 环境变量")
+    print("注意: 请确保已设置 MOONSHOT_MOONSHOT_API_KEY 环境变量")
     
     # 1. 测试图片
     test_image_understanding()
@@ -425,11 +678,31 @@ def main():
     # 创建并测试多种格式文件 (TXT, MD, PDF, DOCX, PPTX, CSV, CODE)
     test_batch_file_understanding()
     
-    # 3. 测试视频 (模拟)
-    test_video_understanding_simulated()
+    # 3. 测试视频
+    local_video_path = "test_video.mp4"
+    if os.path.exists(local_video_path):
+        test_video_understanding_real(local_video_path)
+    else:
+        print(f"⚠️  未检测到本地视频文件: {local_video_path}")
+        print("   跳过真实上传测试。")
     
-    # 4. 测试音频 (模拟)
-    test_audio_understanding_simulated()
+    # 4. 测试音频 (阿里云ASR)
+    # 直接使用 Aliyun ASR 进行测试
+    # 需要确保存在 test_audio.wav 且格式正确 (16k, mono, 16bit)
+    if not os.path.exists("test_audio.wav"):
+        print("❌ 未找到 test_audio.wav，正在尝试生成...")
+        try:
+            # 尝试调用 generate_audio.py 生成
+            import generate_audio
+            generate_audio.create_sine_wave("test_audio.wav", framerate=16000)
+            print("✅ 已生成 test_audio.wav")
+        except ImportError:
+            print("❌ 无法生成音频文件，跳过音频测试。")
+    
+    if os.path.exists("test_audio.wav"):
+        test_audio_understanding_aliyun("test_audio.wav")
+    else:
+        print("❌ 音频文件 test_audio.wav 不存在，跳过阿里云 ASR 测试。")
 
 if __name__ == "__main__":
     # 如果通过命令行参数传入 --no-run，则不运行测试
@@ -437,3 +710,4 @@ if __name__ == "__main__":
         print("已生成脚本，但根据指令跳过运行测试。")
         sys.exit(0)
     main()
+

@@ -3,7 +3,7 @@ import wave
 import struct
 import math
 
-def create_sine_wave(file_path, frequency=440.0, duration=1.0, framerate=44100):
+def create_sine_wave(file_path, frequency=440.0, duration=1.0, framerate=16000):
     """生成一个简单的正弦波音频文件用于测试"""
     n_frames = int(duration * framerate)
     
