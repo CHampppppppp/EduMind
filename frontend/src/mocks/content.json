@@ -3,27 +3,41 @@
   "slides": [
     {
       "id": "s1",
-      "title": "排序算法",
-      "content": "## 介绍\n了解我们如何高效地组织数据。",
-      "notes": "从现实世界的例子开始，比如整理扑克牌。",
+      "title": "电磁感应：探索磁生电的奥秘",
+      "content": "## 课程目标\n- 理解法拉第电磁感应定律\n- 掌握感应电动势的计算\n- 体验科学探究的过程",
+      "notes": "开场语：从奥斯特发现电生磁引入，提出逆向思维。",
       "layout": "title"
     },
     {
       "id": "s2",
-      "title": "冒泡排序",
-      "content": "简单但效率较低。\n- 比较相邻元素\n- 如果顺序错误则交换",
-      "notes": "使用互动游戏进行演示。",
-      "layout": "content",
-      "image": "/mock/images/bubble-sort.png"
+      "title": "法拉第电磁感应定律",
+      "content": "闭合电路中感应电动势的大小，跟穿过这一电路的**磁通量的变化率**成正比。\n\n$$E = n \\frac{\\Delta \\Phi}{\\Delta t}$$",
+      "notes": "强调变化率的概念，类比速度是位移的变化率。",
+      "layout": "content"
+    },
+    {
+      "id": "s3",
+      "title": "实验演示：磁铁穿过线圈",
+      "content": "观察电流计指针的偏转：\n- 插入 vs 拔出\n- 快速 vs 慢速\n- N极 vs S极",
+      "notes": "播放视频片段，引导学生观察现象并记录。",
+      "layout": "image",
+      "image": "/mock/images/experiment-coil.png"
+    },
+    {
+      "id": "s8",
+      "title": "理论推导与应用",
+      "content": "## 思考\n如何量化感应电动势？\n\n我们将结合实验数据进行分析。",
+      "notes": "此处较为枯燥，后续需要优化。",
+      "layout": "content"
     }
   ],
-  "lessonPlan": "# 教案：排序算法\n\n## 教学目标\n学生将理解冒泡排序的原理。\n\n## 活动\n互动排序游戏。",
+  "lessonPlan": "# 教案：电磁感应\n\n## 一、教学目标\n1. 物理观念：理解法拉第电磁感应定律。\n2. 科学思维：通过实验归纳出感应电动势与磁通量变化率的关系。\n\n## 二、教学重难点\n- 重点：法拉第电磁感应定律的理解与应用。\n- 难点：磁通量变化率的概念。\n\n## 三、教学过程\n### 1. 引入（5分钟）\n回顾奥斯特实验，提问：磁能生电吗？展示法拉第的十年探索历程。\n\n### 2. 实验探究（15分钟）\n使用虚拟实验室进行模拟：\n- 控制变量：磁场强弱、运动速度。\n- 记录电流计偏转角度。\n\n### 3. 理论推导（15分钟）\n引导学生分析数据，得出 E ∝ ΔΦ/Δt。\n\n### 4. 巩固练习（5分钟）\n利用右手定则判断感应电流方向，对比楞次定律。\n\n## 四、作业布置\n思考：动生电动势与感生电动势的区别。",
   "games": [
     {
       "id": "game-1",
-      "type": "sorting",
-      "config": { "algorithm": "bubble", "elements": [5, 3, 8, 1, 2] },
-      "previewUrl": "/games/bubble-sort"
+      "type": "physics-lab",
+      "config": { "components": ["magnet", "coil", "galvanometer"] },
+      "previewUrl": "/games/electromagnetic-lab"
     }
   ]
 }

@@ -1,20 +1,29 @@
 [
   {
     "id": "1",
-    "title": "物理学导论.pdf",
+    "title": "高中物理教学大纲_2023.pdf",
     "type": "pdf",
-    "url": "/mock/pdf/intro-physics.pdf",
+    "url": "/mock/pdf/syllabus.pdf",
     "uploadDate": "2023-10-27T10:00:00Z",
     "status": "ready",
-    "summary": "第一章：力学与力"
+    "summary": "包含电磁感应章节核心考点"
   },
   {
     "id": "2",
-    "title": "第3讲：排序算法.mp4",
+    "title": "迈克尔·法拉第生平传记.mp4",
     "type": "video",
-    "url": "/mock/video/sorting.mp4",
+    "url": "/mock/video/faraday.mp4",
     "uploadDate": "2023-10-28T14:30:00Z",
-    "status": "processing",
-    "summary": "冒泡排序与归并排序讲解"
+    "status": "ready",
+    "summary": "实验室片段：磁铁穿过线圈导致电流计偏转"
+  },
+  {
+    "id": "3",
+    "title": "法拉第圆盘发电机案例.docx",
+    "type": "pdf",
+    "url": "/mock/doc/generator.docx",
+    "uploadDate": "2023-10-29T09:15:00Z",
+    "status": "ready",
+    "summary": "应用案例分析"
   }
 ]
