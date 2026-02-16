@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Download, Edit2, X, Send, Sparkles } from 'lucide-react';
-import type { GeneratedContent, Slide } from '@/types';
+import type { GeneratedContent } from '@/types';
 import contentMock from '@/mocks/content.json';
 import { GamePreview } from '@/components/GamePreview';
 
@@ -28,27 +28,10 @@ export function Factory() {
     // Simulate AI modification
     setTimeout(() => {
       setIsGenerating(false);
-      
-      // Check if it's the "Slide 8" scenario (index 3 in our mock which is id s8)
-      if (slide.id === 's8' && editPrompt.includes('发电机')) {
-          const updatedSlide: Slide = {
-            ...slide,
-            title: "法拉第圆盘发电机：理论应用",
-            content: "将圆盘在磁场中旋转，产生持续电流。\n\n**核心公式应用**：\n$$E = \\frac{1}{2} B \\omega r^2$$\n\n这是电磁感应定律从理论走向实践的关键一步。",
-            image: "/mock/images/disk-generator.png",
-            notes: "结合本地案例，讲解发电机原理，从枯燥推导转为工程应用。"
-          };
-          
-          const newSlides = [...content.slides];
-          newSlides[currentSlide] = updatedSlide;
-          setContent({ ...content, slides: newSlides });
-          alert("AI 已根据您的本地案例重绘了幻灯片！");
-      } else {
-         alert("修改已应用: " + editPrompt);
-      }
-      
       setEditPrompt('');
       setIsEditMode(false);
+      // Here you would update the content state with the new slide content
+      alert("修改已应用: " + editPrompt);
     }, 1500);
   };
 
@@ -106,21 +89,8 @@ export function Factory() {
                 </div>
                 
                 {slide.image && (
-                   <div className="mt-4 h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-200">
-                      {slide.image.includes('disk') ? (
-                          <div className="flex flex-col items-center">
-                              <div className="w-16 h-16 rounded-full border-4 border-gray-400 border-t-black animate-spin mb-2"></div>
-                              <span>[法拉第圆盘发电机示意图]</span>
-                          </div>
-                      ) : slide.image.includes('experiment') ? (
-                          <div className="flex flex-col items-center">
-                              <div className="w-20 h-10 border-2 border-gray-400 rounded-lg mb-2 flex items-center justify-center">N --- S</div>
-                              <div className="w-16 h-16 rounded-full border-4 border-gray-300"></div>
-                              <span>[磁铁穿过线圈实验演示]</span>
-                          </div>
-                      ) : (
-                          `[图片占位符: ${slide.image}]`
-                      )}
+                   <div className="mt-4 h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                      [图片占位符: {slide.image}]
                    </div>
                 )}
 
@@ -168,13 +138,13 @@ export function Factory() {
                   >
                     <div className="flex items-center mb-3 text-sm font-medium text-gray-500">
                       <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
-                      AI 修改 (试着输入：结合本地库的“法拉第圆盘发电机”案例)
+                      AI 修改
                     </div>
                     <div className="relative">
                       <textarea 
                         value={editPrompt}
                         onChange={(e) => setEditPrompt(e.target.value)}
-                        placeholder="描述如何修改此幻灯片..."
+                        placeholder="描述如何修改此幻灯片（例如：“简化文本”，“添加一张猫的图片”）..."
                         className="w-full bg-white/50 border border-gray-200 rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 resize-none h-24"
                         disabled={isGenerating}
                       />
@@ -201,7 +171,7 @@ export function Factory() {
               className="h-full w-full overflow-y-auto bg-white rounded-2xl border border-gray-200 p-12 shadow-sm max-w-4xl mx-auto"
             >
               <article className="prose prose-slate max-w-none">
-                <div dangerouslySetInnerHTML={{ __html: content.lessonPlan.replace(/\n/g, '<br/>').replace(/# (.*)/g, '<h1 class="text-4xl font-bold mb-6">$1</h1>').replace(/## (.*)/g, '<h2 class="text-2xl font-semibold mt-8 mb-4">$1</h2>').replace(/### (.*)/g, '<h3 class="text-xl font-medium mt-6 mb-2">$1</h3>') }} />
+                <div dangerouslySetInnerHTML={{ __html: content.lessonPlan.replace(/\n/g, '<br/>').replace(/# (.*)/g, '<h1 class="text-4xl font-bold mb-6">$1</h1>').replace(/## (.*)/g, '<h2 class="text-2xl font-semibold mt-8 mb-4">$1</h2>') }} />
               </article>
             </motion.div>
           )}

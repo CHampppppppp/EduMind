@@ -4,23 +4,22 @@ import type { AIModel } from '@/types';
 
 const mockAnalysis = {
   intent: {
-    topic: "电磁感应：法拉第定律",
-    audience: "高二物理普通班",
-    duration: 40,
+    topic: "排序算法导论",
+    audience: "计算机科学专业大一新生",
+    duration: 45,
     keyPoints: [
-      "法拉第电磁感应定律核心概念",
-      "实验演示（视频解析）",
-      "右手定则对比练习",
-      "实际应用（发电机）"
+      "算法复杂度的概念",
+      "冒泡排序机制",
+      "实践可视化",
+      "与高效算法的比较"
     ],
-    style: "硬核科普，结尾升华"
+    style: "互动与可视化"
   },
   structure: [
-    { section: "引言", points: ["历史背景：奥斯特发现电生磁", "法拉第的逆向思维"] },
-    { section: "核心定律", points: ["磁通量变化率", "感应电动势公式"] },
-    { section: "实验演示", points: ["磁铁穿过线圈（视频解析）", "数据记录与分析"] },
-    { section: "对比练习", points: ["楞次定律 vs 右手定则", "典型例题解析"] },
-    { section: "总结与升华", points: ["从实验室到电气时代", "法拉第精神致敬"] }
+    { section: "引言", points: ["为什么我们需要排序？", "现实世界的例子"] },
+    { section: "冒泡排序", points: ["逐步演示", "互动演示"] },
+    { section: "复杂度分析", points: ["大O表示法", "最好/最坏情况"] },
+    { section: "结论", points: ["总结", "下一步（归并排序）"] }
   ],
   modelUsed: 'kimi-k2.5' as AIModel
 };
