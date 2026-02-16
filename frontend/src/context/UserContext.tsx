@@ -13,12 +13,14 @@ interface UserContextType {
   login: (userData: User) => void;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   // Check for stored user on mount
@@ -32,6 +34,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         localStorage.removeItem("user");
       }
     }
+    setIsLoading(false);
   }, []);
 
   const login = (userData: User) => {
@@ -46,7 +49,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <UserContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <UserContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isLoading }}>
       {children}
     </UserContext.Provider>
   );

@@ -9,6 +9,7 @@ import { Factory } from '@/pages/Factory';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import { UserProvider } from '@/context/UserContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function App() {
   return (
@@ -18,17 +19,19 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          <Route path="/*" element={
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/knowledge" element={<KnowledgeBase />} />
-                <Route path="/chat" element={<Interface />} />
-                <Route path="/analysis" element={<Brain />} />
-                <Route path="/generate" element={<Factory />} />
-              </Routes>
-            </Layout>
-          } />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/*" element={
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/knowledge" element={<KnowledgeBase />} />
+                  <Route path="/chat" element={<Interface />} />
+                  <Route path="/analysis" element={<Brain />} />
+                  <Route path="/generate" element={<Factory />} />
+                </Routes>
+              </Layout>
+            } />
+          </Route>
         </Routes>
         <Toaster duration={1000} />
       </UserProvider>
