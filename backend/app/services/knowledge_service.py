@@ -10,6 +10,7 @@ import pymysql
 from app.core.config import settings
 from app.core.database import get_db_connection
 import hashlib
+from typing import Optional
 
 UPLOAD_DIR = "upload"
 IMAGE_DIR = os.path.join(UPLOAD_DIR, "images")
@@ -71,7 +72,7 @@ class KnowledgeService:
         )
         return user_id
 
-    async def process_upload(self, file: UploadFile) -> dict:
+    async def process_upload(self, file: UploadFile, user_id: Optional[str] = None) -> dict:
         """
         Process uploaded file, extract content/description, and store in ChromaDB.
         """
@@ -152,7 +153,8 @@ class KnowledgeService:
             "original_name": filename,
             "path": file_path,
             "content_type": content_type,
-            "upload_date": upload_date
+            "upload_date": upload_date,
+            "user_id": user_id or "unknown"  # 添加用户ID到元数据
         }
         
         # Add Kimi file ID to metadata if available
@@ -173,12 +175,14 @@ class KnowledgeService:
         relative_path = os.path.relpath(file_path, UPLOAD_DIR)
         url = f"/static/{relative_path}"
         
-        # Store in MySQL
+        # Store in MySQL with user_id
         try:
             conn = get_db_connection()
             with conn.cursor() as cursor:
-                # Get or create default user
-                user_id = self.get_or_create_default_user(cursor)
+                # Use provided user_id, or fallback to default
+                final_user_id = user_id
+                if not final_user_id:
+                    final_user_id = self.get_or_create_default_user(cursor)
                 
                 sql = """
                     INSERT INTO knowledge_base (id, user_id, title, type, url, status, summary, upload_date)
@@ -186,7 +190,7 @@ class KnowledgeService:
                 """
                 cursor.execute(sql, (
                     db_id,
-                    user_id,
+                    final_user_id,
                     filename,
                     category,
                     url,
@@ -196,7 +200,7 @@ class KnowledgeService:
                 ))
             conn.commit()
             conn.close()
-            logger.info(f"Stored item in MySQL: {db_id}")
+            logger.info(f"Stored item in MySQL: {db_id} for user: {final_user_id}")
         except Exception as e:
             logger.error(f"Failed to store in MySQL: {e}")
             # Don't fail the whole request if MySQL fails, as ChromaDB is primary for RAG?
@@ -212,18 +216,24 @@ class KnowledgeService:
             "uploadDate": upload_date
         }
 
-    def get_all_items(self):
+    def get_all_items(self, user_id: Optional[str] = None):
         """
-        Get all items from MySQL (primary) or ChromaDB (fallback).
+        Get all items from MySQL (primary) or ChromaDB (fallback), filtered by user_id.
         """
         items = []
         
-        # Try fetching from MySQL first
+        # Try fetching from MySQL first, filtered by user_id
         try:
             conn = get_db_connection()
             with conn.cursor() as cursor:
-                sql = "SELECT id, title, type, url, status, summary, upload_date FROM knowledge_base ORDER BY upload_date DESC"
-                cursor.execute(sql)
+                if user_id:
+                    sql = "SELECT id, title, type, url, status, summary, upload_date FROM knowledge_base WHERE user_id = %s ORDER BY upload_date DESC"
+                    cursor.execute(sql, (user_id,))
+                else:
+                    # If no user_id provided, return empty list for security
+                    logger.warning("get_all_items called without user_id, returning empty list")
+                    return []
+                
                 results = cursor.fetchall()
                 for row in results:
                     items.append({
@@ -242,8 +252,14 @@ class KnowledgeService:
             logger.error(f"Error getting items from MySQL: {e}")
             # Fallback to ChromaDB below
 
+        # Fallback to ChromaDB (with user_id filtering in metadata)
         try:
-            result = self.collection.get()
+            # Query ChromaDB with user_id filter
+            if user_id:
+                result = self.collection.get(where={"user_id": user_id})
+            else:
+                result = self.collection.get()
+            
             items = []
             if result and result['ids']:
                 for i, doc_id in enumerate(result['ids']):
@@ -272,10 +288,32 @@ class KnowledgeService:
             logger.error(f"Error getting items: {e}")
             return []
 
-    async def delete_item(self, item_id: str) -> bool:
+    async def delete_item(self, item_id: str, user_id: Optional[str] = None) -> bool:
         """
         Delete an item from ChromaDB, filesystem, Kimi, and MySQL.
+        Verifies that the item belongs to the user before deletion.
         """
+        # First, verify ownership via MySQL
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                if user_id:
+                    cursor.execute("SELECT id FROM knowledge_base WHERE id = %s AND user_id = %s", (item_id, user_id))
+                else:
+                    # If no user_id, deny deletion for security
+                    logger.warning(f"Delete attempted without user_id for item: {item_id}")
+                    return False
+                    
+                result = cursor.fetchone()
+                if not result:
+                    logger.warning(f"Item {item_id} not found or does not belong to user {user_id}")
+                    conn.close()
+                    return False
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error verifying item ownership: {e}")
+            return False
+            
         try:
             # 1. Delete from MySQL first (metadata)
             try:

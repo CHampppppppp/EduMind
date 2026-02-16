@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Paperclip, Bot, User, Cpu, Sparkles, BrainCircuit, Plus, History } from 'lucide-react';
 import type { Message, ChatSession } from '@/types';
 import { VoiceInput } from '@/components/VoiceInput';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 import { StreamMarkdown } from '@/components/StreamMarkdown';
+import { authFetch, getStoredUser } from '@/lib/auth';
 
 export function Interface() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -12,17 +14,56 @@ export function Interface() {
   const [isTyping, setIsTyping] = useState(false);
   const [processingState, setProcessingState] = useState<'idle' | 'analyzing_intent' | 'reasoning' | 'summarizing'>('idle');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const [chatId, setChatId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const initialChatId = searchParams.get('id');
+
+  const [chatId, setChatId] = useState<string | null>(initialChatId);
   const [history, setHistory] = useState<ChatSession[]>([]);
+
+  // 清理 WebSocket 连接
+  const cleanupWebSocket = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  };
+
+  // 重置所有状态
+  const resetState = () => {
+    setMessages([]);
+    setInput('');
+    setIsTyping(false);
+    setProcessingState('idle');
+    cleanupWebSocket();
+  };
 
   useEffect(() => {
     fetchHistory();
+    if (initialChatId) {
+      loadChat(initialChatId);
+    }
+  }, [initialChatId]);
+
+  // 监听 chatId 变化，切换对话时重新加载
+  useEffect(() => {
+    if (chatId && chatId !== initialChatId) {
+      resetState();
+      loadChat(chatId);
+    }
+  }, [chatId]);
+
+  // 组件卸载时清理 WebSocket
+  useEffect(() => {
+    return () => {
+      cleanupWebSocket();
+    };
   }, []);
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch('/api/v1/chat/history?days=3');
+      const res = await authFetch('/api/v1/chat/history?days=3');
       const data = await res.json();
       setHistory(data);
     } catch (e) {
@@ -33,7 +74,7 @@ export function Interface() {
   const loadChat = async (id: string) => {
     try {
       setChatId(id);
-      const res = await fetch(`/api/v1/chat/${id}/messages`);
+      const res = await authFetch(`/api/v1/chat/${id}/messages`);
       const data = await res.json();
       const formattedMessages = data.map((msg: any) => ({
         id: msg.id || Date.now().toString(),
@@ -51,8 +92,7 @@ export function Interface() {
   };
 
   const startNewChat = () => {
-    setChatId(null);
-    setMessages([]);
+    window.location.href = '/chat';
   };
 
   useEffect(() => {
@@ -63,6 +103,9 @@ export function Interface() {
 
   const handleSend = () => {
     if (!input.trim()) return;
+
+    // 如果已有连接，先关闭
+    cleanupWebSocket();
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -78,12 +121,15 @@ export function Interface() {
     setProcessingState('analyzing_intent');
 
     const ws = new WebSocket('ws://localhost:8000/api/v1/chat/ws');
+    wsRef.current = ws;
 
     ws.onopen = () => {
+      const user = getStoredUser();
       ws.send(JSON.stringify({
         type: "text_message",
         content: newMessage.content,
-        chat_id: chatId
+        chat_id: chatId,
+        user_id: user?.id || null
       }));
     };
 
@@ -143,10 +189,12 @@ export function Interface() {
       } else if (data.type === 'llm_end') {
         setProcessingState('idle');
         ws.close();
+        wsRef.current = null;
       } else if (data.type === 'error') {
         console.error("WS Error:", data.content);
         setProcessingState('idle');
         ws.close();
+        wsRef.current = null;
       }
     };
 
@@ -180,7 +228,7 @@ export function Interface() {
           {history.map((chat) => (
             <button
               key={chat.id}
-              onClick={() => loadChat(chat.id)}
+              onClick={() => window.location.href = `/chat?id=${chat.id}`}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm truncate transition-colors ${chatId === chat.id
                 ? 'bg-white text-black shadow-sm font-medium'
                 : 'text-gray-600 hover:bg-gray-200/50'

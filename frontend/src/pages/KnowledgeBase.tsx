@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { Upload, FileText, Video, Image as ImageIcon, Music, File as FileIcon, Loader2, Trash2 } from 'lucide-react';
 import type { KnowledgeItem } from '@/types';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { getStoredUser } from '@/lib/auth';
 
 export function KnowledgeBase() {
   const [items, setItems] = useState<KnowledgeItem[]>([]);
@@ -15,7 +16,13 @@ export function KnowledgeBase() {
 
   const fetchItems = async () => {
     try {
-      const response = await fetch('/api/v1/knowledge');
+      const user = getStoredUser();
+      const headers: Record<string, string> = {};
+      if (user && user.id) {
+        headers['X-User-Id'] = user.id;
+      }
+      
+      const response = await fetch('/api/v1/knowledge', { headers });
       if (response.ok) {
         const data = await response.json();
         setItems(data);
@@ -51,9 +58,16 @@ export function KnowledgeBase() {
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 500);
 
+      const user = getStoredUser();
+      const headers: Record<string, string> = {};
+      if (user && user.id) {
+        headers['X-User-Id'] = user.id;
+      }
+
       const response = await fetch('/api/v1/knowledge/upload', {
         method: 'POST',
         body: formData,
+        headers
       });
 
       clearInterval(progressInterval);
@@ -86,8 +100,15 @@ export function KnowledgeBase() {
         onClick: async () => {
           setDeletingId(id);
           try {
+            const user = getStoredUser();
+            const headers: Record<string, string> = {};
+            if (user && user.id) {
+              headers['X-User-Id'] = user.id;
+            }
+            
             const response = await fetch(`/api/v1/knowledge/${id}`, {
               method: 'DELETE',
+              headers
             });
 
             if (response.ok) {

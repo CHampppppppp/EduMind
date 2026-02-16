@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Header
 from app.schemas.schemas import ChatRequest, Message, ChatSession
 from app.core.logger import logger
 from app.core.config import settings
@@ -8,7 +8,7 @@ import json
 import asyncio
 import os
 import uuid
-from typing import List
+from typing import List, Optional
 
 try:
     import dashscope
@@ -19,13 +19,38 @@ except ImportError:
 
 router = APIRouter()
 
-def get_chat_history(chat_id: str, limit: int = 50) -> list:
+def get_user_id_from_header(x_user_id: Optional[str] = Header(None)) -> Optional[str]:
+    """从请求头获取用户ID"""
+    return x_user_id
+
+def get_user_id_or_default(x_user_id: Optional[str] = Header(None)) -> str:
+    """获取用户ID，如果不存在则返回默认用户ID"""
+    if x_user_id:
+        return x_user_id
+    
+    # 如果没有提供用户ID，尝试获取默认用户
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT id FROM users LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                return row['id']
+            # 如果没有用户，创建一个默认用户
+            user_id = str(uuid.uuid4())
+            cursor.execute("INSERT INTO users (id, username, password_hash) VALUES (%s, 'default_user', 'default')", (user_id,))
+            conn.commit()
+            return user_id
+    finally:
+        conn.close()
+
+def get_chat_history(chat_id: str, user_id: str, limit: int = 50) -> list:
     conn = get_db_connection()
     history = []
     try:
         with conn.cursor() as cursor:
-            # Check if chat exists
-            cursor.execute("SELECT id FROM chats WHERE id = %s", (chat_id,))
+            # Check if chat exists and belongs to the user
+            cursor.execute("SELECT id FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
             if not cursor.fetchone():
                 return []
             
@@ -53,18 +78,11 @@ def get_chat_history(chat_id: str, limit: int = 50) -> list:
         conn.close()
     return history
 
-def get_user_chats(days: int = 3) -> List[ChatSession]:
+def get_user_chats(user_id: str, days: int = 3) -> List[ChatSession]:
     conn = get_db_connection()
     chats = []
     try:
         with conn.cursor() as cursor:
-            # Determine user_id (same logic as create_chat_session - temporary fix)
-            cursor.execute("SELECT id FROM users LIMIT 1")
-            row = cursor.fetchone()
-            if not row:
-                return []
-            user_id = row['id']
-
             sql = """
                 SELECT id, title, created_at
                 FROM chats
@@ -86,12 +104,14 @@ def get_user_chats(days: int = 3) -> List[ChatSession]:
     return chats
 
 @router.get("/history", response_model=List[ChatSession])
-async def get_history(days: int = 3):
-    return get_user_chats(days)
+async def get_history(days: int = 3, x_user_id: Optional[str] = Header(None)):
+    user_id = get_user_id_or_default(x_user_id)
+    return get_user_chats(user_id, days)
 
 @router.get("/{chat_id}/messages", response_model=List[Message])
-async def get_messages(chat_id: str):
-    history = get_chat_history(chat_id, limit=100)
+async def get_messages(chat_id: str, x_user_id: Optional[str] = Header(None)):
+    user_id = get_user_id_or_default(x_user_id)
+    history = get_chat_history(chat_id, user_id, limit=100)
     return [Message(**msg, chat_id=chat_id) for msg in history]
 
 
@@ -112,21 +132,13 @@ def save_message(chat_id: str, role: str, content: str, model: str = None, think
         conn.close()
 
 def create_chat_session(title: str = "New Chat", user_id: str = None) -> str:
+    if not user_id:
+        raise ValueError("User ID is required")
+        
     conn = get_db_connection()
     chat_id = str(uuid.uuid4())
     try:
         with conn.cursor() as cursor:
-            # Ensure user exists if provided, otherwise pick default
-            if not user_id:
-                cursor.execute("SELECT id FROM users LIMIT 1")
-                row = cursor.fetchone()
-                if row:
-                    user_id = row['id']
-                else:
-                    # Create default user if none
-                    user_id = str(uuid.uuid4())
-                    cursor.execute("INSERT INTO users (id, username, password_hash) VALUES (%s, 'admin', 'hash')", (user_id,))
-            
             sql = "INSERT INTO chats (id, user_id, title) VALUES (%s, %s, %s)"
             cursor.execute(sql, (chat_id, user_id, title))
         conn.commit()
@@ -138,14 +150,15 @@ def create_chat_session(title: str = "New Chat", user_id: str = None) -> str:
         conn.close()
 
 @router.post("", response_model=Message)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
     logger.info(f"REST Chat request received: {request.content}")
     
+    user_id = get_user_id_or_default(x_user_id)
     chat_id = request.chat_id
     if not chat_id:
         # Create new chat
         try:
-            chat_id = create_chat_session(title=request.content[:20])
+            chat_id = create_chat_session(title=request.content[:20], user_id=user_id)
         except Exception as e:
             logger.error(f"Failed to create chat session: {e}")
             # Fallback to stateless if DB fails
@@ -226,17 +239,15 @@ class WebSocketASRCallback(RecognitionCallback):
              self.loop
         )
 
-async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = None):
-    logger.info(f"Processing LLM request via WebSocket for: {text}, chat_id: {chat_id}")
+async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = None, user_id: str = None):
+    logger.info(f"Processing LLM request via WebSocket for: {text}, chat_id: {chat_id}, user_id: {user_id}")
     await websocket.send_json({"type": "llm_start", "content": ""})
     
-    # If chat_id not provided, try to create one?
+    # If chat_id not provided, try to create one with user_id
     if not chat_id:
         try:
-            chat_id = create_chat_session(title=text[:20])
-            # Send chat_id back to client? 
-            # The current protocol doesn't seem to have a specific message for "chat_started" with ID.
-            # We can include it in llm_end or as a separate message.
+            chat_id = create_chat_session(title=text[:20], user_id=user_id)
+            # Send chat_id back to client
             await websocket.send_json({"type": "chat_info", "chat_id": chat_id})
         except Exception:
             pass
@@ -245,7 +256,7 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
     if chat_id:
         save_message(chat_id, "user", text)
 
-    # Fetch history if chat_id exists
+        # Fetch history if chat_id exists
     history = []
     if chat_id:
         # Get last 10 messages, excluding the one we just saved?
@@ -253,7 +264,7 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
         # We need to exclude the current message from history passed to LLM context usually.
         # But stream_chat logic might handle it.
         # Let's just fetch simplified history.
-        full_history = get_chat_history(chat_id, limit=20)
+        full_history = get_chat_history(chat_id, user_id, limit=20)
         # Convert to format expected by AI service (list of dicts with role/content)
         # We should exclude the very last user message which is 'text'
         if full_history and full_history[-1]['content'] == text:
@@ -352,7 +363,8 @@ async def websocket_endpoint(websocket: WebSocket):
                                 
                     elif msg_type == "text_message":
                         chat_id = data.get("chat_id")
-                        await process_llm_request(websocket, data.get("content"), chat_id)
+                        user_id = data.get("user_id") or get_user_id_or_default(None)
+                        await process_llm_request(websocket, data.get("content"), chat_id, user_id)
                         
                 except json.JSONDecodeError:
                     pass
