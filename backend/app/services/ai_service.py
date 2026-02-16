@@ -309,7 +309,7 @@ class AIService:
         Stream response from Kimi (Moonshot).
         """
         try:
-            messages = [{"role": "system", "content": "你是 EduMind 智能助教，擅长通过循循善诱的方式教学。"}]
+            messages = [{"role": "system", "content": "你是 EduMind 智能教研助手，专门辅助教师进行教学工作。你的职责是协助教师设计课程、优化教案、解答教学难题以及提供创新的教学思路。你的回答应当专业、高效、具有建设性，并视用户为教育领域的同行专家。"}]
             messages.extend(history[-10:])
             messages.append({"role": "user", "content": content})
             
@@ -339,7 +339,7 @@ class AIService:
                 f"用户的问题是：'{user_query}'\n\n"
                 f"DeepSeek 的推理过程如下：\n{reasoning}\n\n"
                 f"DeepSeek 的最终答案是：\n{answer}\n\n"
-                "请作为一名优秀的老师，综合以上信息，给学生一个清晰、易懂的讲解。不要直接扔答案，要包含解题思路的总结。"
+                "请作为一名资深的教研顾问，综合以上信息，为教师提供专业的分析与建议。请重点阐述如何将这些推理逻辑应用到实际教学中，或者如何引导学生理解这些概念。你的目标是帮助教师更好地进行教学设计。"
             )
             
             response = await self.kimi_client.chat.completions.create(

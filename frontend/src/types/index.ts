@@ -23,6 +23,12 @@ export interface Message {
   thinking?: string; // Chain of thought for reasoning models
 }
 
+export interface ChatSession {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
 // Module 3: Brain (Intent & Analysis)
 export interface TeachingIntent {
   topic: string;

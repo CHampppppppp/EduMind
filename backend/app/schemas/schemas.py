@@ -23,6 +23,12 @@ class Message(BaseModel):
     model: Optional[str] = None
     thinking: Optional[str] = None
     chat_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+class ChatSession(BaseModel):
+    id: str
+    title: str
+    created_at: str
 
 # Analysis Models
 class AnalysisIntent(BaseModel):

@@ -68,7 +68,7 @@ def create_tables():
         print("Creating table 'knowledge_base'...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS knowledge_base (
-                id VARCHAR(36) PRIMARY KEY,
+                id VARCHAR(50) PRIMARY KEY,
                 user_id VARCHAR(36) NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 type VARCHAR(50) NOT NULL,

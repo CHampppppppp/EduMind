@@ -40,7 +40,7 @@ export function Layout({ children }: LayoutProps) {
              <div className="text-sm text-muted-foreground">未登录</div>
            )}
         </header>
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-hidden h-full flex flex-col">
            {children}
         </div>
       </main>

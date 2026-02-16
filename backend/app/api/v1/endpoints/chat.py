@@ -1,5 +1,5 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from app.schemas.schemas import ChatRequest, Message
+from app.schemas.schemas import ChatRequest, Message, ChatSession
 from app.core.logger import logger
 from app.core.config import settings
 from app.core.database import get_db_connection
@@ -8,6 +8,7 @@ import json
 import asyncio
 import os
 import uuid
+from typing import List
 
 try:
     import dashscope
@@ -18,7 +19,7 @@ except ImportError:
 
 router = APIRouter()
 
-def get_chat_history(chat_id: str, limit: int = 10) -> list:
+def get_chat_history(chat_id: str, limit: int = 50) -> list:
     conn = get_db_connection()
     history = []
     try:
@@ -30,7 +31,7 @@ def get_chat_history(chat_id: str, limit: int = 10) -> list:
             
             # Get messages
             sql = """
-                SELECT role, content 
+                SELECT role, content, model, thinking, created_at
                 FROM messages 
                 WHERE chat_id = %s 
                 ORDER BY created_at ASC 
@@ -39,12 +40,60 @@ def get_chat_history(chat_id: str, limit: int = 10) -> list:
             cursor.execute(sql, (chat_id, limit))
             results = cursor.fetchall()
             for row in results:
-                history.append({"role": row['role'], "content": row['content']})
+                history.append({
+                    "role": row['role'], 
+                    "content": row['content'],
+                    "model": row.get('model'),
+                    "thinking": row.get('thinking'),
+                    "created_at": str(row['created_at'])
+                })
     except Exception as e:
         logger.error(f"Error fetching chat history: {e}")
     finally:
         conn.close()
     return history
+
+def get_user_chats(days: int = 3) -> List[ChatSession]:
+    conn = get_db_connection()
+    chats = []
+    try:
+        with conn.cursor() as cursor:
+            # Determine user_id (same logic as create_chat_session - temporary fix)
+            cursor.execute("SELECT id FROM users LIMIT 1")
+            row = cursor.fetchone()
+            if not row:
+                return []
+            user_id = row['id']
+
+            sql = """
+                SELECT id, title, created_at
+                FROM chats
+                WHERE user_id = %s AND created_at >= NOW() - INTERVAL %s DAY
+                ORDER BY created_at DESC
+            """
+            cursor.execute(sql, (user_id, days))
+            results = cursor.fetchall()
+            for row in results:
+                chats.append(ChatSession(
+                    id=row['id'],
+                    title=row['title'] or "New Chat",
+                    created_at=str(row['created_at'])
+                ))
+    except Exception as e:
+        logger.error(f"Error fetching chats: {e}")
+    finally:
+        conn.close()
+    return chats
+
+@router.get("/history", response_model=List[ChatSession])
+async def get_history(days: int = 3):
+    return get_user_chats(days)
+
+@router.get("/{chat_id}/messages", response_model=List[Message])
+async def get_messages(chat_id: str):
+    history = get_chat_history(chat_id, limit=100)
+    return [Message(**msg, chat_id=chat_id) for msg in history]
+
 
 def save_message(chat_id: str, role: str, content: str, model: str = None, thinking: str = None):
     conn = get_db_connection()
@@ -230,7 +279,8 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
                     current_model = event["model"]
             elif event["type"] == "thinking_chunk":
                 full_thinking += event["content"]
-                await websocket.send_json(event)
+                # Don't send thinking chunk to frontend to keep it implicit
+                # await websocket.send_json(event)
             else:
                 await websocket.send_json(event)
         
