@@ -17,7 +17,6 @@ export function Layout({ children }: LayoutProps) {
              <div className="flex items-center gap-4">
                 <div className="flex flex-col items-end">
                     <span className="text-sm font-medium leading-none">{user.username}</span>
-                    <span className="text-xs text-muted-foreground">ID: {user.id.slice(0, 8)}...</span>
                 </div>
                 {user.avatar_url ? (
                     <img 
