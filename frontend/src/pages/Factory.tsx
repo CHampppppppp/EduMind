@@ -134,7 +134,7 @@ export function Factory() {
                     initial={{ opacity: 0, y: 20, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                    className="absolute bottom-24 right-8 w-96 glass p-4 rounded-2xl border border-white/20 shadow-xl z-20"
+                    className="absolute top-20 right-8 w-96 glass p-4 rounded-2xl border border-white/20 shadow-xl z-20"
                   >
                     <div className="flex items-center mb-3 text-sm font-medium text-gray-500">
                       <Sparkles className="h-4 w-4 mr-2 text-purple-500" />

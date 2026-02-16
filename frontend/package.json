@@ -10,12 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@ricky0123/vad-react": "^0.0.36",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.0",
     "lucide-react": "^0.564.0",
+    "onnxruntime-web": "^1.24.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
+    "react-use-websocket": "^4.13.0",
     "tailwind-merge": "^3.4.1"
   },
   "devDependencies": {

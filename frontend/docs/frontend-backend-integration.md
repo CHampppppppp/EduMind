@@ -4,7 +4,8 @@
 当前前端实现使用的是位于 `src/mocks` 中的模拟数据。
 
 ## 基础 URL (Base URL)
-`http://localhost:8000/api/v1`
+- REST: `http://localhost:8000/api/v1`
+- WebSocket: `ws://localhost:8000/api/v1`
 
 ## 1. 知识库 (RAG)
 
@@ -31,16 +32,23 @@
 
 ## 2. 对话交互 (Interface)
 
-### 发送消息
-- **端点 (Endpoint)**: `POST /chat`
-- **请求体 (Body)**:
+### 发送消息 (WebSocket - 推荐)
+- **端点 (Endpoint)**: `WS /chat/ws`
+- **发送 (Send)**:
 ```json
 {
   "content": "创建一节关于排序的课程",
-  "history": [] // 可选的上下文历史
+  "history": []
 }
 ```
-- **响应 (Response)**: `Message` (AI 回复)
+- **接收 (Receive)**: 流式消息
+  - 开始: `{"type": "start", "content": ""}`
+  - 片段: `{"type": "chunk", "content": "这里是..."}`
+  - 结束: `{"type": "end", "content": ""}`
+
+### 发送消息 (REST - 仅限非流式)
+- **端点 (Endpoint)**: `POST /chat`
+- **响应 (Response)**: `Message`
 
 ## 3. 意图理解 (Brain)
 
@@ -63,15 +71,21 @@
 
 ## 4. 课件工厂 (Factory)
 
-### 生成内容
-- **端点 (Endpoint)**: `POST /generate`
-- **请求体 (Body)**:
+### 生成内容 (WebSocket - 推荐)
+- **端点 (Endpoint)**: `WS /generate/ws`
+- **发送 (Send)**:
 ```json
 {
   "analysisId": "123",
   "modifiers": "使其更具互动性"
 }
 ```
+- **接收 (Receive)**: 进度与结果
+  - 进度: `{"type": "progress", "step": "正在生成大纲...", "progress": 20}`
+  - 结果: `{"type": "result", "data": GeneratedContent}`
+
+### 生成内容 (REST)
+- **端点 (Endpoint)**: `POST /generate`
 - **响应 (Response)**: `GeneratedContent`
 ```json
 {
