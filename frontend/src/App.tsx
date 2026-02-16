@@ -6,20 +6,32 @@ import { KnowledgeBase } from '@/pages/KnowledgeBase';
 import { Interface } from '@/pages/Interface';
 import { Brain } from '@/pages/Brain';
 import { Factory } from '@/pages/Factory';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import { UserProvider } from '@/context/UserContext';
 
 function App() {
   return (
     <Router>
-      <Layout>
+      <UserProvider>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/knowledge" element={<KnowledgeBase />} />
-          <Route path="/chat" element={<Interface />} />
-          <Route path="/analysis" element={<Brain />} />
-          <Route path="/generate" element={<Factory />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          <Route path="/*" element={
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/knowledge" element={<KnowledgeBase />} />
+                <Route path="/chat" element={<Interface />} />
+                <Route path="/analysis" element={<Brain />} />
+                <Route path="/generate" element={<Factory />} />
+              </Routes>
+            </Layout>
+          } />
         </Routes>
-      </Layout>
-      <Toaster duration={1000} />
+        <Toaster duration={1000} />
+      </UserProvider>
     </Router>
   );
 }

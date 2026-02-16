@@ -2,7 +2,7 @@
 export interface KnowledgeItem {
   id: string;
   title: string;
-  type: 'pdf' | 'video';
+  type: 'pdf' | 'video' | 'image' | 'audio' | 'document' | string;
   url: string;
   uploadDate: string;
   status: 'processing' | 'ready' | 'error';
@@ -10,7 +10,7 @@ export interface KnowledgeItem {
 }
 
 // Module 2: Interface (Chat)
-export type AIModel = 'kimi-k2.5' | 'deepseek-v4';
+export type AIModel = 'kimi-k2.5' | 'deepseek-v4' | 'deepseek-v3-reasoner';
 
 export interface Message {
   id: string;

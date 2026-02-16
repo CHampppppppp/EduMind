@@ -8,6 +8,8 @@ class KnowledgeItem(BaseModel):
     type: str
     url: str
     status: str
+    summary: Optional[str] = None
+    uploadDate: Optional[str] = None
 
 # Chat Models
 class ChatRequest(BaseModel):
@@ -45,3 +47,17 @@ class GeneratedContent(BaseModel):
     slides: List[dict]
     lessonPlan: str
     games: List[dict]
+
+# Auth Models
+class UserBase(BaseModel):
+    username: str
+
+class UserCreate(UserBase):
+    password: str
+
+class UserLogin(UserBase):
+    password: str
+
+class UserResponse(UserBase):
+    id: str
+    avatar_url: Optional[str] = None

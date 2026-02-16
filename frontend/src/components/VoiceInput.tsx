@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
 import hark from 'hark';
-import { Mic, Square, Loader2, Volume2 } from 'lucide-react';
+import { Mic, Square } from 'lucide-react';
 import { toast } from "sonner";
 
 interface VoiceInputProps {
   onTranscriptUpdate: (text: string, isFinal: boolean) => void;
   onLLMMessage: (text: string, isFinal: boolean) => void;
+  onRecordingStart?: () => void;
 }
 
-export function VoiceInput({ onTranscriptUpdate, onLLMMessage }: VoiceInputProps) {
+export function VoiceInput({ onTranscriptUpdate, onLLMMessage, onRecordingStart }: VoiceInputProps) {
   const [isRecording, setIsRecording] = useState(false);
   const isRecordingRef = useRef(false);
   const [status, setStatus] = useState<'idle' | 'listening' | 'speaking' | 'processing'>('idle');
+  const committedTranscriptRef = useRef('');
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -46,11 +48,12 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage }: VoiceInputProps
       const msg = lastJsonMessage as any;
       if (msg.type === 'asr_partial') {
         // Real-time partial result
-        onTranscriptUpdate(msg.content, false);
+        onTranscriptUpdate(committedTranscriptRef.current + msg.content, false);
         setStatus('speaking');
       } else if (msg.type === 'asr_final') {
         // Final result for a sentence, but not sending to LLM yet
-        onTranscriptUpdate(msg.content, false);
+        committedTranscriptRef.current += msg.content;
+        onTranscriptUpdate(committedTranscriptRef.current, false);
         setStatus('listening');
       } else if (msg.type === 'asr_stopped') {
         // Recording stopped completely
@@ -144,6 +147,9 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage }: VoiceInputProps
       // Notify Backend
       sendMessage(JSON.stringify({ type: 'start_recording' }));
 
+      committedTranscriptRef.current = '';
+      onRecordingStart?.();
+
       setIsRecording(true);
       isRecordingRef.current = true;
       setStatus('listening');
@@ -209,11 +215,6 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage }: VoiceInputProps
         {isRecording ? <Square className="h-5 w-5 z-10" /> : <Mic className="h-5 w-5 z-10" />}
       </button>
 
-      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 h-5 flex items-center justify-center whitespace-nowrap pointer-events-none">
-        {status === 'listening' && <span className="text-xs text-gray-500 animate-pulse">正在聆听...</span>}
-        {status === 'speaking' && <span className="text-xs text-blue-500 font-medium flex items-center"><Volume2 className="h-3 w-3 mr-1" /> 检测到语音</span>}
-        {status === 'processing' && <span className="text-xs text-green-600 font-medium flex items-center"><Loader2 className="h-3 w-3 animate-spin mr-1" /> AI 思考中...</span>}
-      </div>
     </div>
   );
 }

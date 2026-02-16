@@ -1,12 +1,18 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.api import api_router
 from app.core.logger import setup_logging
+import os
 
 # Setup logging
 setup_logging()
 
 app = FastAPI(title="EduMind Backend", openapi_url="/api/v1/openapi.json")
+
+# Ensure upload directory exists for static serving
+os.makedirs("upload", exist_ok=True)
+app.mount("/static", StaticFiles(directory="upload"), name="static")
 
 # Set all CORS enabled origins
 app.add_middleware(

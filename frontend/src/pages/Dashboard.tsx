@@ -19,8 +19,9 @@ export function Dashboard() {
   };
 
   return (
-    <div className="space-y-12 pb-12">
-      <header>
+    <div className="h-full overflow-y-auto p-8 container mx-auto max-w-7xl custom-scrollbar">
+      <div className="space-y-12 pb-12">
+        <header>
         <motion.h1 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -142,6 +143,7 @@ export function Dashboard() {
           ))}
         </div>
       </motion.div>
+      </div>
     </div>
   );
 }

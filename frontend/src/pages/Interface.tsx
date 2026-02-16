@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, Paperclip, Bot, User, Cpu, Sparkles, BrainCircuit } from 'lucide-react';
+import { Send, Paperclip, Bot, User, Cpu, Sparkles, BrainCircuit } from 'lucide-react';
 import type { Message } from '@/types';
 import { VoiceInput } from '@/components/VoiceInput';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { StreamMarkdown } from '@/components/StreamMarkdown';
 
 export function Interface() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -122,7 +124,7 @@ export function Interface() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-full p-8 container mx-auto max-w-7xl custom-scrollbar">
       <header className="mb-6 flex justify-between items-center border-b border-gray-100 pb-4">
         <div>
           <h1 className="text-3xl font-light tracking-tight">对话交互</h1>
@@ -139,7 +141,7 @@ export function Interface() {
 
       <div className="flex-1 overflow-y-auto space-y-8 pr-4 pb-4 custom-scrollbar">
         <AnimatePresence>
-          {messages.map((msg) => (
+          {messages.map((msg, index) => (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, y: 10 }}
@@ -176,13 +178,23 @@ export function Interface() {
                     {msg.thinking && (
                       <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-100 text-xs text-gray-500 italic flex items-start">
                         <Cpu className="h-3 w-3 mr-2 mt-0.5 flex-shrink-0 animate-pulse" />
-                        <div>
+                        <div className="w-full">
                           <div className="font-semibold not-italic mb-1 text-gray-600">DeepSeek 推理过程:</div>
-                          {msg.thinking}
+                          {msg.role === 'assistant' && index === messages.length - 1 ? (
+                            <StreamMarkdown content={msg.thinking} />
+                          ) : (
+                            <MarkdownRenderer content={msg.thinking} />
+                          )}
                         </div>
                       </div>
                     )}
-                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    <div className="text-sm leading-relaxed text-gray-800 dark:text-gray-100">
+                      {msg.role === 'assistant' && index === messages.length - 1 ? (
+                        <StreamMarkdown content={msg.content} />
+                      ) : (
+                        <MarkdownRenderer content={msg.content} />
+                      )}
+                    </div>
                     <div className={`text-[10px] mt-2 opacity-70 uppercase tracking-wider font-medium ${msg.role === 'user' ? 'text-gray-400' : 'text-gray-400'}`}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>

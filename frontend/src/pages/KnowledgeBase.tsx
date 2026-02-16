@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, Video, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Upload, FileText, Video, Image as ImageIcon, Music, File as FileIcon, MoreHorizontal, Loader2 } from 'lucide-react';
 import type { KnowledgeItem } from '@/types';
 
 export function KnowledgeBase() {
@@ -8,47 +8,91 @@ export function KnowledgeBase() {
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchItems = async () => {
+    try {
+      const response = await fetch('/api/v1/knowledge');
+      if (response.ok) {
+        const data = await response.json();
+        setItems(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch knowledge items:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setItems([]);
-      setLoading(false);
-    }, 1000);
+    fetchItems();
   }, []);
 
-  const handleUpload = () => {
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     setIsUploading(true);
-    setUploadProgress(0);
-    
-    // Simulate upload progress
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-             setIsUploading(false);
-             // Add a new mock item
-             const newItem: KnowledgeItem = {
-               id: Date.now().toString(),
-               title: "高等量子力学.pdf",
-               type: 'pdf',
-               url: "#",
-               uploadDate: new Date().toISOString(),
-               status: 'processing',
-               summary: "正在分析内容..."
-             };
-             setItems(prev => [newItem, ...prev]);
-          }, 500);
-          return 100;
-        }
-        return prev + 10;
+    setUploadProgress(10); // Start progress
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // Simulate progress for UX since fetch doesn't support progress events easily
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 500);
+
+      const response = await fetch('/api/v1/knowledge/upload', {
+        method: 'POST',
+        body: formData,
       });
-    }, 200);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (response.ok) {
+        const newItem = await response.json();
+        setItems(prev => [newItem, ...prev]);
+      } else {
+        console.error("Upload failed");
+        // Show error toast or something
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+    } finally {
+      setTimeout(() => {
+        setIsUploading(false);
+        setUploadProgress(0);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }, 500);
+    }
+  };
+
+  const getIcon = (type: string) => {
+    if (type === 'image') return <ImageIcon className="h-6 w-6" />;
+    if (type === 'video') return <Video className="h-6 w-6" />;
+    if (type === 'audio') return <Music className="h-6 w-6" />;
+    if (type === 'pdf') return <FileText className="h-6 w-6" />;
+    return <FileIcon className="h-6 w-6" />;
+  };
+
+  const getColorClass = (type: string) => {
+    if (type === 'image') return 'bg-purple-50 text-purple-500 group-hover:bg-purple-100';
+    if (type === 'video') return 'bg-blue-50 text-blue-500 group-hover:bg-blue-100';
+    if (type === 'audio') return 'bg-yellow-50 text-yellow-500 group-hover:bg-yellow-100';
+    if (type === 'pdf') return 'bg-red-50 text-red-500 group-hover:bg-red-100';
+    return 'bg-gray-50 text-gray-500 group-hover:bg-gray-100';
   };
 
   return (
-    <div className="space-y-8 relative min-h-full">
+    <div className="h-full overflow-y-auto p-8 container mx-auto max-w-7xl custom-scrollbar">
+      <div className="space-y-8 relative min-h-full">
       <header className="flex justify-between items-center">
         <div>
           <motion.h1 
@@ -60,14 +104,23 @@ export function KnowledgeBase() {
           </motion.h1>
           <p className="mt-2 text-muted-foreground">管理您的教学素材和资源。</p>
         </div>
-        <button 
-          onClick={handleUpload}
-          disabled={isUploading}
-          className="bg-black text-white px-6 py-3 rounded-xl font-medium flex items-center hover:bg-gray-800 transition-colors disabled:opacity-50"
-        >
-          {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Upload className="mr-2 h-5 w-5" />}
-          {isUploading ? '正在上传...' : '上传新文件'}
-        </button>
+        <div className="flex gap-2">
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx"
+            />
+            <button 
+            onClick={handleUploadClick}
+            disabled={isUploading}
+            className="bg-black text-white px-6 py-3 rounded-xl font-medium flex items-center hover:bg-gray-800 transition-colors disabled:opacity-50"
+            >
+            {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Upload className="mr-2 h-5 w-5" />}
+            {isUploading ? '正在上传...' : '上传新文件'}
+            </button>
+        </div>
       </header>
 
       {/* Upload Progress Overlay */}
@@ -114,12 +167,14 @@ export function KnowledgeBase() {
                 className="group glass p-6 rounded-xl border border-white/20 hover:border-black/10 transition-all flex items-center justify-between"
               >
                 <div className="flex items-center space-x-4">
-                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${item.type === 'pdf' ? 'bg-red-50 text-red-500 group-hover:bg-red-100' : 'bg-blue-50 text-blue-500 group-hover:bg-blue-100'}`}>
-                    {item.type === 'pdf' ? <FileText className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+                  <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${getColorClass(item.type)}`}>
+                    {getIcon(item.type)}
                   </div>
                   <div>
                     <h3 className="font-medium text-lg">{item.title}</h3>
-                    <p className="text-sm text-muted-foreground">{new Date(item.uploadDate).toLocaleDateString()} • {item.summary}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {new Date(item.uploadDate).toLocaleDateString()} • {item.summary || '无描述'}
+                    </p>
                   </div>
                 </div>
                 
@@ -139,6 +194,7 @@ export function KnowledgeBase() {
           </AnimatePresence>
         </motion.div>
       )}
+      </div>
     </div>
   );
 }

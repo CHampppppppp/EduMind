@@ -35,7 +35,7 @@ export function Factory() {
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col">
+    <div className="h-full flex flex-col p-8 container mx-auto max-w-7xl custom-scrollbar">
       <header className="mb-6 flex justify-between items-center border-b border-gray-100 pb-4">
         <div>
           <h1 className="text-3xl font-light tracking-tight">课件工厂</h1>
