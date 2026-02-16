@@ -15,12 +15,14 @@ class KnowledgeItem(BaseModel):
 class ChatRequest(BaseModel):
     content: str
     history: List[dict] = []
+    chat_id: Optional[str] = None
 
 class Message(BaseModel):
     role: str
     content: str
     model: Optional[str] = None
     thinking: Optional[str] = None
+    chat_id: Optional[str] = None
 
 # Analysis Models
 class AnalysisIntent(BaseModel):

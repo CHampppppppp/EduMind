@@ -6,6 +6,10 @@ from datetime import datetime
 from fastapi import UploadFile
 from app.services.ai_service import ai_service
 from app.core.logger import logger
+import pymysql
+from app.core.config import settings
+from app.core.database import get_db_connection
+import hashlib
 
 UPLOAD_DIR = "upload"
 IMAGE_DIR = os.path.join(UPLOAD_DIR, "images")
@@ -17,11 +21,55 @@ DOC_DIR = os.path.join(UPLOAD_DIR, "documents")
 for d in [IMAGE_DIR, AUDIO_DIR, VIDEO_DIR, DOC_DIR]:
     os.makedirs(d, exist_ok=True)
 
+from chromadb.utils import embedding_functions
+
+# Configure ChromaDB to use local cache directory for models if possible
+# or just increase timeout/retry logic
+# For now, let's just make sure we catch initialization errors gracefully
+# and perhaps use a specific model that is known to be small.
+
 class KnowledgeService:
     def __init__(self):
-        # Initialize ChromaDB
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
-        self.collection = self.chroma_client.get_or_create_collection(name="knowledge_base")
+        try:
+            # Initialize ChromaDB
+            self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+            
+            # Explicitly use default embedding function but can be swapped
+            # The default is all-MiniLM-L6-v2. 
+            # If download fails, user might need to download manually or check network.
+            self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
+            
+            self.collection = self.chroma_client.get_or_create_collection(
+                name="knowledge_base",
+                embedding_function=self.embedding_fn
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize ChromaDB: {e}")
+            # Fallback or re-raise depending on how critical this is.
+            # For now, we'll log it.
+            self.collection = None
+
+    def get_or_create_default_user(self, cursor) -> str:
+        """
+        Get the default admin user ID, or create it if not exists.
+        """
+        username = "admin"
+        cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
+        result = cursor.fetchone()
+        
+        if result:
+            return result['id']
+        
+        # Create default user
+        user_id = str(uuid.uuid4())
+        password_hash = hashlib.sha256("admin".encode()).hexdigest()
+        avatar_url = f"https://api.dicebear.com/7.x/avataaars/svg?seed={username}"
+        
+        cursor.execute(
+            "INSERT INTO users (id, username, password_hash, avatar_url) VALUES (%s, %s, %s, %s)",
+            (user_id, username, password_hash, avatar_url)
+        )
+        return user_id
 
     async def process_upload(self, file: UploadFile) -> dict:
         """
@@ -66,12 +114,15 @@ class KnowledgeService:
 
         # Process content based on category
         extracted_text = ""
+        kimi_file_id = None
+        
         try:
             if category == "image":
-                extracted_text = await ai_service.get_image_description(file_path)
+                extracted_text, kimi_file_id = await ai_service.get_image_description(file_path)
             elif category == "video":
-                extracted_text = await ai_service.get_video_description(file_path)
+                extracted_text, kimi_file_id = await ai_service.get_video_description(file_path)
             elif category == "audio":
+                # Audio uses DashScope, so no Kimi file ID
                 extracted_text = await ai_service.get_audio_text(file_path)
             else:
                 # Text or Document (PDF, etc.)
@@ -79,25 +130,39 @@ class KnowledgeService:
                     with open(file_path, "r", encoding="utf-8") as f:
                         extracted_text = f.read()
                 else:
-                    extracted_text = await ai_service.get_document_content(file_path)
+                    extracted_text, kimi_file_id = await ai_service.get_document_content(file_path)
         except Exception as e:
             logger.error(f"AI processing failed for {filename}: {e}")
             extracted_text = "Content extraction failed."
 
+        # Ensure extracted_text is not None
+        if extracted_text is None:
+            extracted_text = "Content extraction failed."
+
         # Store in ChromaDB
+        if not self.collection:
+            logger.error("ChromaDB collection not initialized")
+            raise Exception("Database not initialized")
+
         db_id = f"{category}-{file_id}"
         upload_date = datetime.now().isoformat()
+        
+        metadata = {
+            "type": category,
+            "original_name": filename,
+            "path": file_path,
+            "content_type": content_type,
+            "upload_date": upload_date
+        }
+        
+        # Add Kimi file ID to metadata if available
+        if kimi_file_id:
+            metadata["kimi_file_id"] = kimi_file_id
         
         try:
             self.collection.add(
                 documents=[extracted_text],
-                metadatas=[{
-                    "type": category,
-                    "original_name": filename,
-                    "path": file_path,
-                    "content_type": content_type,
-                    "upload_date": upload_date
-                }],
+                metadatas=[metadata],
                 ids=[db_id]
             )
         except Exception as e:
@@ -107,6 +172,35 @@ class KnowledgeService:
         # Generate URL relative to static mount
         relative_path = os.path.relpath(file_path, UPLOAD_DIR)
         url = f"/static/{relative_path}"
+        
+        # Store in MySQL
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                # Get or create default user
+                user_id = self.get_or_create_default_user(cursor)
+                
+                sql = """
+                    INSERT INTO knowledge_base (id, user_id, title, type, url, status, summary, upload_date)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(sql, (
+                    db_id,
+                    user_id,
+                    filename,
+                    category,
+                    url,
+                    "ready",
+                    extracted_text[:500], # Limit summary length
+                    upload_date
+                ))
+            conn.commit()
+            conn.close()
+            logger.info(f"Stored item in MySQL: {db_id}")
+        except Exception as e:
+            logger.error(f"Failed to store in MySQL: {e}")
+            # Don't fail the whole request if MySQL fails, as ChromaDB is primary for RAG?
+            # Or should we rollback? For now, just log error.
 
         return {
             "id": db_id,
@@ -120,8 +214,34 @@ class KnowledgeService:
 
     def get_all_items(self):
         """
-        Get all items from ChromaDB.
+        Get all items from MySQL (primary) or ChromaDB (fallback).
         """
+        items = []
+        
+        # Try fetching from MySQL first
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                sql = "SELECT id, title, type, url, status, summary, upload_date FROM knowledge_base ORDER BY upload_date DESC"
+                cursor.execute(sql)
+                results = cursor.fetchall()
+                for row in results:
+                    items.append({
+                        "id": row['id'],
+                        "title": row['title'],
+                        "type": row['type'],
+                        "url": row['url'],
+                        "status": row['status'],
+                        "summary": row['summary'],
+                        "uploadDate": row['upload_date'].isoformat() if isinstance(row['upload_date'], datetime) else str(row['upload_date'])
+                    })
+            conn.close()
+            if items:
+                return items
+        except Exception as e:
+            logger.error(f"Error getting items from MySQL: {e}")
+            # Fallback to ChromaDB below
+
         try:
             result = self.collection.get()
             items = []
@@ -151,5 +271,65 @@ class KnowledgeService:
         except Exception as e:
             logger.error(f"Error getting items: {e}")
             return []
+
+    async def delete_item(self, item_id: str) -> bool:
+        """
+        Delete an item from ChromaDB, filesystem, Kimi, and MySQL.
+        """
+        try:
+            # 1. Delete from MySQL first (metadata)
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cursor:
+                    cursor.execute("DELETE FROM knowledge_base WHERE id = %s", (item_id,))
+                conn.commit()
+                conn.close()
+                logger.info(f"Deleted item from MySQL: {item_id}")
+            except Exception as e:
+                logger.error(f"Error deleting from MySQL: {e}")
+
+            if not self.collection:
+                raise Exception("Database not initialized")
+                
+            # 2. Get item metadata to find file path and potentially Kimi file ID
+            result = self.collection.get(ids=[item_id])
+            if not result or not result['ids']:
+                logger.warning(f"Item not found in ChromaDB: {item_id}")
+                # Even if not found in ChromaDB, we might have deleted from MySQL successfully
+                # return True if at least MySQL deletion worked? 
+                # Or proceed to try to cleanup files anyway if we can infer path?
+                # Without Chroma metadata we don't know the file path easily unless we query MySQL first.
+                # But we already deleted from MySQL.
+                # Let's assume if it's gone from MySQL, it's "deleted" for the user.
+                return True
+                
+            metadatas = result['metadatas']
+            file_path = None
+            kimi_file_id = None
+            
+            if metadatas and metadatas[0]:
+                file_path = metadatas[0].get("path")
+                kimi_file_id = metadatas[0].get("kimi_file_id") # We need to store this!
+                
+            # 2. Delete from Kimi if ID exists
+            if kimi_file_id:
+                await ai_service.delete_file(kimi_file_id)
+                
+            # 3. Delete file from disk
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted file: {file_path}")
+                except Exception as e:
+                    logger.error(f"Error deleting file {file_path}: {e}")
+            
+            # 4. Delete from ChromaDB
+            self.collection.delete(ids=[item_id])
+            logger.info(f"Deleted item from ChromaDB: {item_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error deleting item {item_id}: {e}")
+            return False
 
 knowledge_service = KnowledgeService()

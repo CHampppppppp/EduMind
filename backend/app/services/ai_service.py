@@ -1,3 +1,4 @@
+import os
 from openai import AsyncOpenAI
 from app.core.config import settings
 from app.core.logger import logger
@@ -17,31 +18,38 @@ class AIService:
     def __init__(self):
         # Initialize Kimi (Moonshot) Client
         self.kimi_client = AsyncOpenAI(
-            api_key=settings.MOONSHOT_API_KEY,
+            api_key=settings.MOONSHOT_API_KEY or "placeholder", # Prevent init error if key missing
             base_url="https://api.moonshot.cn/v1",
         )
         
         # Initialize DeepSeek Client
         self.deepseek_client = AsyncOpenAI(
-            api_key=settings.DEEPSEEK_API_KEY,
+            api_key=settings.DEEPSEEK_API_KEY or "placeholder", # Prevent init error if key missing
             base_url="https://api.deepseek.com/v1",
         )
         
         self.kimi_model = "kimi-k2.5"
         self.deepseek_model = "deepseek-reasoner"
 
-    async def get_image_description(self, file_path: str) -> str:
+    async def get_image_description(self, file_path: str) -> tuple[str, str | None]:
         """
         Get description for an image using Kimi Vision.
+        Returns: (description, kimi_file_id)
         """
         try:
-            # Upload file to Kimi
-            # Note: AsyncOpenAI client supports files.create
+            # Async file upload
+            # Note: For AsyncOpenAI, we need to read the file content
+            # The 'file' parameter in create() expects a tuple (filename, content) or a file-like object
+            # But when using 'with open' in async context, we need to be careful.
+            # Let's read it into memory for safety with async client
+            
             with open(file_path, "rb") as f:
-                file_object = await self.kimi_client.files.create(
-                    file=f,
-                    purpose="file-extract" 
-                )
+                file_content = f.read()
+                
+            file_object = await self.kimi_client.files.create(
+                file=(os.path.basename(file_path), file_content),
+                purpose="image"
+            )
             file_id = file_object.id
             
             # Use file content in chat
@@ -70,33 +78,23 @@ class AIService:
                     }
                 ],
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content, file_id
         except Exception as e:
             logger.error(f"Error describing image: {e}")
-            return "无法描述图片内容。"
+            return "无法描述图片内容。", None
 
-    async def get_video_description(self, file_path: str) -> str:
+    async def get_video_description(self, file_path: str) -> tuple[str, str | None]:
         """
         Get description for a video using Kimi Video Understanding.
+        Returns: (description, kimi_file_id)
         """
         try:
-            # Upload video file
-            # Note: OpenAI SDK 'files.create' is for file-extract/fine-tune.
-            # Moonshot uses 'purpose="video"'?
-            # The test file uses 'client.files.create(file=f, purpose="video")' (sync client).
-            # Let's try with async client.
             
             # Async file upload
             with open(file_path, "rb") as f:
                  file_object = await self.kimi_client.files.create(
                     file=f,
-                    purpose="file-extract" # SDK might strictly check purpose enum? 
-                    # Actually Moonshot documentation says "file-extract" is for Kimi Chat to read.
-                    # But for video, test file used purpose="video".
-                    # Standard OpenAI SDK only allows 'fine-tune' or 'assistants'.
-                    # Moonshot might have patched it or allows strings.
-                    # Let's assume "file-extract" works for now as general purpose, or try "video" if we can.
-                    # If strictly type checked, we might need to cast.
+                    purpose="video"
                  )
             file_id = file_object.id
             
@@ -134,15 +132,15 @@ class AIService:
                 model=self.kimi_model,
                 messages=[{"role": "user", "content": content_list}],
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content, file_id
         except Exception as e:
             logger.error(f"Error describing video: {e}")
-            # Fallback: try using file-extract if video purpose fails
-            return "无法描述视频内容。"
+            return "无法描述视频内容。", None
 
-    async def get_document_content(self, file_path: str) -> str:
+    async def get_document_content(self, file_path: str) -> tuple[str, str | None]:
         """
         Get content from a document (PDF, Docx, etc.) using Kimi File Extract.
+        Returns: (content, kimi_file_id)
         """
         try:
             with open(file_path, "rb") as f:
@@ -168,12 +166,12 @@ class AIService:
                     await asyncio.sleep(1)
             
             if not content:
-                return "无法提取文件内容。"
+                return "无法提取文件内容。", file_id
             
-            return content
+            return content, file_id
         except Exception as e:
             logger.error(f"Error extracting document: {e}")
-            return "无法提取文件内容。"
+            return "无法提取文件内容。", None
 
     async def get_audio_text(self, file_path: str) -> str:
         """
@@ -428,5 +426,19 @@ class AIService:
             "model": model,
             "thinking": full_thinking
         }
+
+    async def delete_file(self, file_id: str) -> bool:
+        """
+        Delete file from Kimi (Moonshot).
+        """
+        try:
+            # Note: AsyncOpenAI doesn't have delete method for files?
+            # Actually it does: client.files.delete(file_id)
+            await self.kimi_client.files.delete(file_id)
+            logger.info(f"Deleted file from Kimi: {file_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting file from Kimi {file_id}: {e}")
+            return False
 
 ai_service = AIService()

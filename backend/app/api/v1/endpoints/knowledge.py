@@ -26,3 +26,15 @@ async def upload_knowledge(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{item_id}")
+async def delete_knowledge_item(item_id: str):
+    logger.info(f"Deleting knowledge item: {item_id}")
+    try:
+        success = await knowledge_service.delete_item(item_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Item not found or failed to delete")
+        return {"status": "success", "message": f"Item {item_id} deleted"}
+    except Exception as e:
+        logger.error(f"Delete failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

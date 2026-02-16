@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: Optional[str] = None
     MOONSHOT_API_KEY: Optional[str] = None
     
+    # Database
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 3306
+    DB_USER: str = "root"
+    DB_PASSWORD: str = ""
+    DB_NAME: str = "edumind"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

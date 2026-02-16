@@ -2,15 +2,23 @@ import pymysql
 import sys
 import os
 
-# Database configuration
-DB_HOST = "localhost"
-DB_USER = "root"
-DB_PASSWORD = "123456"
-DB_NAME = "edumind"
+# Add the parent directory to sys.path to allow importing app
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from app.core.config import settings
+from app.core.logger import logger
+
+# Database configuration from settings
+DB_HOST = settings.DB_HOST
+DB_PORT = settings.DB_PORT
+DB_USER = settings.DB_USER
+DB_PASSWORD = settings.DB_PASSWORD
+DB_NAME = settings.DB_NAME
 
 def get_connection(db_name=None):
     return pymysql.connect(
         host=DB_HOST,
+        port=DB_PORT,
         user=DB_USER,
         password=DB_PASSWORD,
         database=db_name,
@@ -19,32 +27,33 @@ def get_connection(db_name=None):
     )
 
 def create_database():
-    print(f"Connecting to MySQL at {DB_HOST}...")
+    logger.info(f"Connecting to MySQL at {DB_HOST}:{DB_PORT}...")
     try:
         conn = pymysql.connect(
             host=DB_HOST,
+            port=DB_PORT,
             user=DB_USER,
             password=DB_PASSWORD,
             charset='utf8mb4'
         )
         cursor = conn.cursor()
-        print(f"Creating database '{DB_NAME}' if not exists...")
+        logger.info(f"Creating database '{DB_NAME}' if not exists...")
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
         conn.commit()
         conn.close()
-        print(f"Database '{DB_NAME}' created or already exists.")
+        logger.info(f"Database '{DB_NAME}' created or already exists.")
     except Exception as e:
-        print(f"Error creating database: {e}")
+        logger.error(f"Error creating database: {e}")
         sys.exit(1)
 
 def create_tables():
-    print(f"Connecting to database '{DB_NAME}'...")
+    logger.info(f"Connecting to database '{DB_NAME}'...")
     try:
         conn = get_connection(DB_NAME)
         cursor = conn.cursor()
 
         # Table: users
-        print("Creating table 'users'...")
+        logger.info("Creating table 'users'...")
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id VARCHAR(36) PRIMARY KEY,
