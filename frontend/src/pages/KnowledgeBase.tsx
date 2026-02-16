@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, Video, MoreHorizontal, Loader2 } from 'lucide-react';
 import type { KnowledgeItem } from '@/types';
-import knowledgeMock from '@/mocks/knowledge.json';
 
 export function KnowledgeBase() {
   const [items, setItems] = useState<KnowledgeItem[]>([]);
@@ -13,7 +12,7 @@ export function KnowledgeBase() {
   useEffect(() => {
     // Simulate API call
     setTimeout(() => {
-      setItems(knowledgeMock as KnowledgeItem[]);
+      setItems([]);
       setLoading(false);
     }, 1000);
   }, []);

@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
 import { Layout } from '@/components/layout/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { KnowledgeBase } from '@/pages/KnowledgeBase';
@@ -18,6 +19,7 @@ function App() {
           <Route path="/generate" element={<Factory />} />
         </Routes>
       </Layout>
+      <Toaster duration={1000} />
     </Router>
   );
 }

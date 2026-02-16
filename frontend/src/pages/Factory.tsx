@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Download, Edit2, X, Send, Sparkles } from 'lucide-react';
 import type { GeneratedContent } from '@/types';
-import contentMock from '@/mocks/content.json';
 import { GamePreview } from '@/components/GamePreview';
 
 export function Factory() {
@@ -14,7 +13,7 @@ export function Factory() {
   const [isGenerating, setIsGenerating] = useState(false);
   
   useEffect(() => {
-    setContent(contentMock as unknown as GeneratedContent);
+    // setContent(contentMock as unknown as GeneratedContent);
   }, []);
 
   if (!content) return <div>加载中...</div>;

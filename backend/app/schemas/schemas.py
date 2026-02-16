@@ -17,6 +17,8 @@ class ChatRequest(BaseModel):
 class Message(BaseModel):
     role: str
     content: str
+    model: Optional[str] = None
+    thinking: Optional[str] = None
 
 # Analysis Models
 class AnalysisIntent(BaseModel):
