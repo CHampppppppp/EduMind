@@ -42,6 +42,35 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage, onRecordingStart 
     },
   });
 
+  const stopRecording = useCallback(() => {
+    if (!isRecordingRef.current) return;
+
+    // Stop tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+
+    // Disconnect nodes
+    if (sourceRef.current) sourceRef.current.disconnect();
+    if (processorRef.current) processorRef.current.disconnect();
+    if (audioContextRef.current) audioContextRef.current.close();
+    if (speechEventsRef.current) speechEventsRef.current.stop();
+
+    // Reset refs
+    streamRef.current = null;
+    sourceRef.current = null;
+    processorRef.current = null;
+    audioContextRef.current = null;
+    speechEventsRef.current = null;
+
+    // Notify Backend
+    sendMessage(JSON.stringify({ type: 'stop_recording' }));
+
+    setIsRecording(false);
+    isRecordingRef.current = false;
+    // Status will be updated by backend messages
+  }, [sendMessage]);
+
   // Handle incoming messages
   useEffect(() => {
     if (lastJsonMessage) {
@@ -69,7 +98,7 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage, onRecordingStart 
         stopRecording();
       }
     }
-  }, [lastJsonMessage, onTranscriptUpdate, onLLMMessage]);
+  }, [lastJsonMessage, onTranscriptUpdate, onLLMMessage, stopRecording]);
 
   const processAudio = useCallback((inputData: Float32Array) => {
     if (readyState !== ReadyState.OPEN || !isRecordingRef.current) return;
@@ -159,35 +188,6 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage, onRecordingStart 
       console.error('Error accessing microphone:', err);
       toast.error('无法访问麦克风，请检查权限。');
     }
-  };
-
-  const stopRecording = () => {
-    if (!isRecordingRef.current) return;
-
-    // Stop tracks
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-
-    // Disconnect nodes
-    if (sourceRef.current) sourceRef.current.disconnect();
-    if (processorRef.current) processorRef.current.disconnect();
-    if (audioContextRef.current) audioContextRef.current.close();
-    if (speechEventsRef.current) speechEventsRef.current.stop();
-
-    // Reset refs
-    streamRef.current = null;
-    sourceRef.current = null;
-    processorRef.current = null;
-    audioContextRef.current = null;
-    speechEventsRef.current = null;
-
-    // Notify Backend
-    sendMessage(JSON.stringify({ type: 'stop_recording' }));
-
-    setIsRecording(false);
-    isRecordingRef.current = false;
-    // Status will be updated by backend messages
   };
 
   const toggleRecording = () => {

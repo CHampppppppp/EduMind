@@ -18,6 +18,8 @@ export function Dashboard() {
     show: { opacity: 1, y: 0 }
   };
 
+  const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
+
   return (
     <div className="h-full overflow-y-auto p-8 container mx-auto max-w-7xl custom-scrollbar">
       <div className="space-y-12 pb-12">
@@ -27,7 +29,7 @@ export function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="text-5xl font-light tracking-tight text-foreground"
         >
-          欢迎回来，<span className="font-medium">老师</span>
+          欢迎回来 , <span className="font-medium">{userInfo.username}</span>
         </motion.h1>
         <motion.p 
           initial={{ opacity: 0 }}

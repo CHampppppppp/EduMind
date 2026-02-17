@@ -21,6 +21,7 @@ export interface Message {
   attachments?: string[]; // IDs of KnowledgeItems
   model?: AIModel; // The model used to generate this response
   thinking?: string; // Chain of thought for reasoning models
+  thinkingCollapsed?: boolean; // Whether thinking is collapsed
 }
 
 export interface ChatSession {

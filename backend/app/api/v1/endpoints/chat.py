@@ -25,6 +25,10 @@ def get_user_id_from_header(x_user_id: Optional[str] = Header(None)) -> Optional
 
 def get_user_id_or_default(x_user_id: Optional[str] = Header(None)) -> str:
     """获取用户ID，如果不存在则返回默认用户ID"""
+    return get_user_id_from_db_or_default(x_user_id)
+
+def get_user_id_from_db_or_default(x_user_id: Optional[str] = None) -> str:
+    """获取用户ID，如果不存在则返回默认用户ID（用于非FastAPI依赖注入场景）"""
     if x_user_id:
         return x_user_id
     
@@ -108,6 +112,29 @@ async def get_history(days: int = 3, x_user_id: Optional[str] = Header(None)):
     user_id = get_user_id_or_default(x_user_id)
     return get_user_chats(user_id, days)
 
+@router.delete("/{chat_id}")
+async def delete_chat(chat_id: str, x_user_id: Optional[str] = Header(None)):
+    """删除指定对话"""
+    user_id = get_user_id_or_default(x_user_id)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 先删除该聊天下的所有消息
+            cursor.execute("DELETE FROM messages WHERE chat_id = %s", (chat_id,))
+            # 再删除聊天会话
+            cursor.execute("DELETE FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
+            conn.commit()
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Chat not found")
+            return {"message": "Chat deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting chat: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete chat")
+    finally:
+        conn.close()
+
 @router.get("/{chat_id}/messages", response_model=List[Message])
 async def get_messages(chat_id: str, x_user_id: Optional[str] = Header(None)):
     user_id = get_user_id_or_default(x_user_id)
@@ -158,16 +185,22 @@ async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
     if not chat_id:
         # Create new chat
         try:
-            chat_id = create_chat_session(title=request.content[:20], user_id=user_id)
+            # 如果 content 为空，使用默认标题
+            title = request.content[:20] if request.content else "新对话"
+            chat_id = create_chat_session(title=title, user_id=user_id)
         except Exception as e:
             logger.error(f"Failed to create chat session: {e}")
             # Fallback to stateless if DB fails
             chat_id = None
     
-    # Save user message if we have a chat_id
-    if chat_id:
+    # Save user message if we have a chat_id and content is not empty
+    if chat_id and request.content:
         save_message(chat_id, "user", request.content)
         
+    # 如果 content 为空，只返回 chat_id，不调用 AI 服务
+    if not request.content:
+        return Message(role="assistant", content="", chat_id=chat_id)
+
     try:
         # Use provided history if available, otherwise fetch from DB if chat_id exists?
         # For REST, usually provided history is preferred for stateless-like behavior with state.
@@ -241,16 +274,24 @@ class WebSocketASRCallback(RecognitionCallback):
 
 async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = None, user_id: str = None):
     logger.info(f"Processing LLM request via WebSocket for: {text}, chat_id: {chat_id}, user_id: {user_id}")
+    
+    # 如果没有 user_id，获取默认用户
+    if not user_id:
+        user_id = get_user_id_from_db_or_default(None)
+    
     await websocket.send_json({"type": "llm_start", "content": ""})
     
     # If chat_id not provided, try to create one with user_id
     if not chat_id:
         try:
+            logger.info(f"Creating new chat session for user: {user_id}")
             chat_id = create_chat_session(title=text[:20], user_id=user_id)
+            logger.info(f"Chat session created successfully: {chat_id}")
             # Send chat_id back to client
             await websocket.send_json({"type": "chat_info", "chat_id": chat_id})
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to create chat session: {e}", exc_info=True)
+            # 继续尝试处理，不要直接退出
             
     # Save user message
     if chat_id:
@@ -276,24 +317,39 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
     full_thinking = ""
     current_model = "unknown"
 
+    # Helper function to safely send JSON
+    async def safe_send(data: dict) -> bool:
+        try:
+            await websocket.send_json(data)
+            return True
+        except Exception as e:
+            logger.warning(f"WebSocket connection closed, cannot send message: {e}")
+            return False
+
     try:
         # Use AIService Streaming
         async for event in ai_service.stream_chat(text, history):
             # Pass through the event directly to WebSocket
             # Event types: status, thinking_chunk, thinking_done, llm_chunk, llm_end
+            logger.info(f"AI service event: {event['type']}")
             if event["type"] == "llm_chunk":
                 # Ensure content is not empty
                 if event["content"]:
                     full_response += event["content"]
-                    await websocket.send_json(event)
+                    if not await safe_send(event):
+                        break  # Exit loop if WebSocket is closed
                 if "model" in event:
                     current_model = event["model"]
             elif event["type"] == "thinking_chunk":
                 full_thinking += event["content"]
-                # Don't send thinking chunk to frontend to keep it implicit
-                # await websocket.send_json(event)
+                # Send thinking chunk to frontend for streaming display
+                if not await safe_send(event):
+                    break
+            elif event["type"] == "thinking_done":
+                pass
             else:
-                await websocket.send_json(event)
+                if not await safe_send(event):
+                    break  # Exit loop if WebSocket is closed
         
         # Save assistant response
         if chat_id:
@@ -301,7 +357,6 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
             
     except Exception as e:
         logger.error(f"Error in WebSocket LLM process: {e}")
-        await websocket.send_json({"type": "error", "content": "AI processing failed"})
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -322,7 +377,14 @@ async def websocket_endpoint(websocket: WebSocket):
     
     try:
         while True:
-            message = await websocket.receive()
+            try:
+                message = await websocket.receive()
+            except RuntimeError as e:
+                # WebSocket connection has been closed/disconnected
+                if "disconnect message has been received" in str(e):
+                    logger.info("WebSocket disconnected by client")
+                    break
+                raise
             
             if "bytes" in message:
                 if recognition:
@@ -363,7 +425,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 
                     elif msg_type == "text_message":
                         chat_id = data.get("chat_id")
-                        user_id = data.get("user_id") or get_user_id_or_default(None)
+                        user_id = data.get("user_id") or get_user_id_from_db_or_default(None)
                         await process_llm_request(websocket, data.get("content"), chat_id, user_id)
                         
                 except json.JSONDecodeError:
