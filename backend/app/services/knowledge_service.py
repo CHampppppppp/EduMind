@@ -288,6 +288,35 @@ class KnowledgeService:
             logger.error(f"Error getting items: {e}")
             return []
 
+    def query_knowledge(self, query: str, n_results: int = 3, user_id: Optional[str] = None) -> list[str]:
+        """
+        Query the knowledge base for relevant documents.
+        """
+        if not self.collection:
+            logger.warning("ChromaDB collection not initialized.")
+            return []
+            
+        try:
+            where_filter = {}
+            if user_id:
+                where_filter["user_id"] = user_id
+                
+            results = self.collection.query(
+                query_texts=[query],
+                n_results=n_results,
+                where=where_filter if where_filter else None
+            )
+            
+            documents = []
+            if results and results['documents']:
+                for doc_list in results['documents']:
+                    documents.extend(doc_list)
+                    
+            return documents
+        except Exception as e:
+            logger.error(f"Error querying knowledge base: {e}")
+            return []
+
     async def delete_item(self, item_id: str, user_id: Optional[str] = None) -> bool:
         """
         Delete an item from ChromaDB, filesystem, Kimi, and MySQL.

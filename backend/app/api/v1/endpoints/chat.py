@@ -150,7 +150,7 @@ async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
 
     try:
         history = request.history
-        result = await ai_service.process_chat_full(request.content, history)
+        result = await ai_service.process_chat_full(request.content, history, user_id=user_id)
         
         response = Message(
             role=result["role"],
@@ -237,7 +237,7 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
             return False
 
     try:
-        async for event in ai_service.stream_chat(text, history):
+        async for event in ai_service.stream_chat(text, history, user_id=user_id):
             if event["type"] == "llm_chunk":
                 if event["content"]:
                     full_response += event["content"]

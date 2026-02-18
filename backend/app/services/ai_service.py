@@ -252,7 +252,21 @@ class AIService:
             logger.error(f"Error summarizing with Kimi: {e}")
             yield answer
 
-    async def stream_chat(self, content: str, history: list):
+    async def stream_chat(self, content: str, history: list, user_id: str = None):
+        # RAG Retrieval
+        yield {"type": "status", "content": "retrieving_knowledge"}
+        
+        # Local import to avoid circular dependency
+        from app.services.knowledge_service import knowledge_service
+        
+        relevant_docs = knowledge_service.query_knowledge(content, user_id=user_id)
+        
+        rag_content = content
+        if relevant_docs:
+            context_str = "\n\n".join(relevant_docs)
+            rag_content = f"基于以下参考资料回答问题。如果参考资料不包含答案，请根据你的知识回答，但优先使用参考资料。\n\n参考资料：\n{context_str}\n\n用户问题：{content}"
+            yield {"type": "status", "content": "knowledge_found"}
+
         yield {"type": "status", "content": "analyzing_intent"}
         needs_reasoning = await self.check_intent(content)
         
@@ -263,7 +277,7 @@ class AIService:
             full_answer = ""
             
             try:
-                async for chunk in self.stream_deepseek_reasoning(content):
+                async for chunk in self.stream_deepseek_reasoning(rag_content):
                     if chunk["type"] == "reasoning":
                         full_reasoning += chunk["content"]
                         yield {"type": "thinking_chunk", "content": chunk["content"]}
@@ -272,7 +286,7 @@ class AIService:
             except Exception as e:
                 logger.error(f"DeepSeek stream failed: {e}")
                 yield {"type": "status", "content": "fallback_generating"}
-                async for chunk in self.stream_kimi_response(content, history):
+                async for chunk in self.stream_kimi_response(rag_content, history):
                     yield {"type": "llm_chunk", "content": chunk, "model": "kimi-k2.5-fallback"}
                 yield {"type": "llm_end", "content": ""}
                 return
@@ -285,17 +299,17 @@ class AIService:
                 
         else:
             yield {"type": "status", "content": "generating"}
-            async for chunk in self.stream_kimi_response(content, history):
+            async for chunk in self.stream_kimi_response(rag_content, history):
                 yield {"type": "llm_chunk", "content": chunk, "model": "kimi-k2.5"}
         
         yield {"type": "llm_end", "content": ""}
 
-    async def process_chat_full(self, content: str, history: list) -> dict:
+    async def process_chat_full(self, content: str, history: list, user_id: str = None) -> dict:
         full_content = ""
         full_thinking = ""
         model = "kimi-k2.5"
         
-        async for event in self.stream_chat(content, history):
+        async for event in self.stream_chat(content, history, user_id=user_id):
             if event["type"] == "llm_chunk":
                 full_content += event["content"]
                 if "model" in event:

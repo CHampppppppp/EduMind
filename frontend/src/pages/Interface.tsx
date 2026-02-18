@@ -161,7 +161,10 @@ export function Interface() {
       timestamp: new Date().toISOString()
     };
 
-    setMessages([...messages, newMessage]);
+    setMessages(prev => {
+      const sanitized = prev.map(m => m.id === 'temp-ai' ? { ...m, id: generateId() } : m);
+      return [...sanitized, newMessage];
+    });
     setInput('');
     setIsTyping(true);
     setProcessingState('analyzing_intent');
@@ -215,11 +218,13 @@ export function Interface() {
             }];
           });
         } else if (data.type === 'llm_end') {
+          setMessages(prev => prev.map(m => m.id === 'temp-ai' ? { ...m, id: generateId() } : m));
           setProcessingState('idle');
           ws.close();
           wsRef.current = null;
         } else if (data.type === 'error') {
           console.error("WS Error:", data.content);
+          setMessages(prev => prev.map(m => m.id === 'temp-ai' ? { ...m, id: generateId() } : m));
           setProcessingState('idle');
           ws.close();
           wsRef.current = null;
@@ -234,7 +239,7 @@ export function Interface() {
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1];
         if (lastMsg?.id === 'temp-ai') {
-          return prev.map(m => m.id === 'temp-ai' ? { ...m, content: m.content + '\n\n⚠️ 连接出现问题，请重试。' } : m);
+          return prev.map(m => m.id === 'temp-ai' ? { ...m, id: generateId(), content: m.content + '\n\n⚠️ 连接出现问题，请重试。' } : m);
         }
         return [...prev, {
           id: generateId(),
