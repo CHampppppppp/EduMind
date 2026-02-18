@@ -17,7 +17,7 @@ export function Dashboard() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <NavLink to="/chat">
+          <NavLink to="/interface">
             <div className="h-full glass p-8 rounded-2xl border border-white/20 hover:border-black/10 transition-all hover:shadow-xl hover:-translate-y-1 group cursor-pointer relative overflow-hidden">
               <div className="absolute top-0 right-0 p-32 bg-gradient-to-br from-gray-50 to-transparent rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform duration-700"></div>
 
@@ -35,7 +35,7 @@ export function Dashboard() {
             </div>
           </NavLink>
 
-          <NavLink to="/knowledge">
+          <NavLink to="/knowledgeBase">
             <div className="h-full glass p-8 rounded-2xl border border-white/20 hover:border-black/10 transition-all hover:shadow-xl hover:-translate-y-1 group cursor-pointer relative overflow-hidden">
               <div className="absolute top-0 right-0 p-32 bg-gradient-to-br from-blue-50 to-transparent rounded-full -mr-16 -mt-16 opacity-50 group-hover:scale-110 transition-transform duration-700"></div>
 

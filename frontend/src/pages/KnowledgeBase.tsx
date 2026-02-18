@@ -126,7 +126,8 @@ export function KnowledgeBase() {
       cancel: {
         label: "取消",
         onClick: () => { }
-      }
+      },
+      duration: Infinity, 
     });
   };
 

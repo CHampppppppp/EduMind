@@ -140,6 +140,9 @@ class KnowledgeService:
         if extracted_text is None:
             extracted_text = "Content extraction failed."
 
+        # Add filename to the beginning of the text to improve retrieval
+        final_text = f"Filename: {filename}\n\n{extracted_text}"
+
         # Store in ChromaDB
         if not self.collection:
             logger.error("ChromaDB collection not initialized")
@@ -163,7 +166,7 @@ class KnowledgeService:
         
         try:
             self.collection.add(
-                documents=[extracted_text],
+                documents=[final_text],
                 metadatas=[metadata],
                 ids=[db_id]
             )

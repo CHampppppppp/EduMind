@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Send, Paperclip, Bot, Sparkles, BrainCircuit, Plus, History, Trash2, User, Cpu } from 'lucide-react';
+import { Send, Paperclip, Bot, Sparkles, BrainCircuit, Plus, History, Trash2, User, Cpu, Database } from 'lucide-react';
 import type { Message, ChatSession } from '@/types';
 import { VoiceInput } from '@/components/VoiceInput';
 import { StreamMarkdown } from '@/components/StreamMarkdown';
@@ -12,20 +12,17 @@ export function Interface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [processingState, setProcessingState] = useState<'idle' | 'analyzing_intent' | 'reasoning' | 'summarizing'>('idle');
+  const [processingState, setProcessingState] = useState<'idle' | 'analyzing_intent' | 'reasoning' | 'summarizing' | 'retrieving_knowledge'>('idle');
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialChatId = searchParams.get('id');
   const [chatId, setChatId] = useState<string | null>(initialChatId);
   const [history, setHistory] = useState<ChatSession[]>([]);
-
-  useEffect(() => {
-    if (searchParams.get('id') !== chatId) {
-      setChatId(searchParams.get('id'));
-    }
-  }, [searchParams, chatId]);
+  const isInitialized = useRef(false);
+  const skipNextLoadChat = useRef(false);
 
   const cleanupWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -62,7 +59,6 @@ export function Interface() {
       if (res.ok) {
         const data = await res.json();
         if (data.chat_id) {
-          setChatId(data.chat_id);
           return data.chat_id;
         }
       }
@@ -79,7 +75,8 @@ export function Interface() {
       if (res.ok) {
         setHistory(prev => prev.filter(chat => chat.id !== idToDelete));
         if (chatId === idToDelete) {
-          navigate('/chat');
+          localStorage.removeItem('lastChatId');
+          navigate('/interface');
           resetState();
           setChatId(null);
         }
@@ -113,42 +110,73 @@ export function Interface() {
   };
 
   const startNewChat = () => {
-    navigate('/chat');
+    localStorage.removeItem('lastChatId');
+    navigate('/interface');
     resetState();
     setChatId(null);
   };
 
   useEffect(() => {
-    if (chatId) {
-      loadChat(chatId);
+    const urlId = searchParams.get('id');
+
+    if (!urlId) {
+      const lastId = localStorage.getItem('lastChatId');
+      if (lastId) {
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.set('id', lastId);
+          return newParams;
+        }, { replace: true });
+      } else {
+        if (chatId !== null) {
+          setChatId(null);
+          resetState();
+        }
+      }
     } else {
-      resetState();
+      if (urlId !== chatId) {
+        setChatId(urlId);
+      }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (chatId) {
+      if (skipNextLoadChat.current) {
+        skipNextLoadChat.current = false;
+        return;
+      }
+      localStorage.setItem('lastChatId', chatId);
+      loadChat(chatId);
     }
   }, [chatId]);
 
   useEffect(() => {
     fetchHistory();
-    if (!initialChatId) {
-      initChatSession();
-    }
-  }, [initialChatId]);
+  }, []);
 
   useEffect(() => {
     return () => cleanupWebSocket();
   }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages, isTyping, processingState]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
 
+    let currentChatId = chatId;
+
     if (!chatId) {
       const newChatId = await initChatSession();
       if (!newChatId) return;
+      skipNextLoadChat.current = true;
+      setChatId(newChatId);
+      setSearchParams({ id: newChatId }, { replace: true });
+      currentChatId = newChatId;
     }
 
     cleanupWebSocket();
@@ -181,7 +209,7 @@ export function Interface() {
         ws.send(JSON.stringify({
           type: "text_message",
           content: newMessage.content,
-          chat_id: chatId,
+          chat_id: currentChatId,
           user_id: user?.id || null
         }));
       }, 300);
@@ -197,6 +225,7 @@ export function Interface() {
           if (data.content === 'analyzing_intent') setProcessingState('analyzing_intent');
           else if (data.content === 'reasoning') setProcessingState('reasoning');
           else if (data.content === 'summarizing' || data.content === 'generating') setProcessingState('summarizing');
+          else if (data.content === 'retrieving_knowledge') setProcessingState('retrieving_knowledge');
         } else if (data.type === 'llm_chunk') {
           if (isFirstChunk) {
             setIsTyping(false);
@@ -254,6 +283,8 @@ export function Interface() {
     ws.onclose = () => { };
   };
 
+  const isNewChat = messages.length === 0;
+
   return (
     <div className="flex h-full w-full">
       <div className="w-64 border-r border-gray-200 bg-gray-50 flex flex-col p-4">
@@ -281,7 +312,7 @@ export function Interface() {
               className={`group flex items-center justify-between px-3 py-2 rounded-lg text-sm truncate transition-colors ${isTyping ? 'opacity-50 cursor-not-allowed' : chatId === chat.id ? 'bg-white text-black shadow-sm font-medium' : 'text-gray-600 hover:bg-gray-200/50'}`}
             >
               <button
-                onClick={() => !isTyping && navigate(`/chat?id=${chat.id}`)}
+                onClick={() => !isTyping && navigate(`/interface?id=${chat.id}`)}
                 disabled={isTyping}
                 className="flex-1 text-left truncate"
               >
@@ -300,7 +331,7 @@ export function Interface() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col h-full relative min-w-0">
+      <div className="flex-1 flex flex-col h-full relative min-w-0 bg-white">
         <header className="px-8 py-6 flex justify-between items-center border-b border-gray-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
           <div>
             <h1 className="text-3xl font-light tracking-tight">对话交互</h1>
@@ -314,116 +345,142 @@ export function Interface() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto space-y-8 p-8 custom-scrollbar overscroll-none scroll-smooth">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex items-end max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-3`}>
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}>
-                  {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                </div>
-                <div className="flex flex-col items-start w-full min-w-0">
-                  <div className={`p-4 rounded-2xl shadow-sm w-full overflow-hidden ${msg.role === 'user' ? 'bg-black text-white rounded-br-none' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none'}`}>
-                    <div className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}>
-                      <StreamMarkdown content={msg.content} />
-                    </div>
-                    <div className="text-[10px] mt-2 opacity-70 uppercase tracking-wider font-medium text-gray-400">
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        <div className="flex-1 relative flex flex-col overflow-hidden">
+          {/* Greeting - Only visible in new chat */}
+          <div className={`absolute inset-0 flex flex-col items-center justify-center pb-40 transition-opacity duration-300 ${isNewChat ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className="bg-transparent p-4 rounded-3xl mb-8 flex items-center justify-center">
+              <Bot className="h-5 w-5 text-black mr-4" />
+              <h2 className="text-2xl font-medium text-gray-900">今天有什么可以帮到你？</h2>
+            </div>
+          </div>
+
+          <div
+            ref={messagesContainerRef}
+            className={`flex-1 overflow-y-auto space-y-8 p-8 custom-scrollbar overscroll-none scroll-smooth ${isNewChat ? 'invisible' : 'visible'}`}
+          >
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex items-end max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-3`}>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}>
+                    {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                  </div>
+                  <div className="flex flex-col items-start w-full min-w-0">
+                    <div className={`p-4 rounded-2xl shadow-sm w-full overflow-hidden ${msg.role === 'user' ? 'bg-black text-white rounded-br-none' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none'}`}>
+                      <div className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}>
+                        <StreamMarkdown content={msg.content} />
+                      </div>
+                      <div className="text-[10px] mt-2 opacity-70 uppercase tracking-wider font-medium text-gray-400">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
 
-          {isTyping && (
-            <div className="flex justify-start items-end space-x-3">
-              <div className="h-8 w-8 rounded-full bg-gray-100 text-black flex items-center justify-center flex-shrink-0">
-                <Bot className="h-4 w-4" />
+            {isTyping && (
+              <div className="flex justify-start items-end space-x-3">
+                <div className="h-8 w-8 rounded-full bg-gray-100 text-black flex items-center justify-center flex-shrink-0">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-bl-none flex flex-col space-y-1 shadow-sm min-w-[150px]">
+                  {processingState === 'analyzing_intent' && (
+                    <span className="text-xs text-blue-500 font-medium flex items-center animate-pulse">
+                      <BrainCircuit className="h-3 w-3 mr-2" />
+                      正在识别意图...
+                    </span>
+                  )}
+                  {processingState === 'retrieving_knowledge' && (
+                    <span className="text-xs text-orange-500 font-medium flex items-center animate-pulse">
+                      <Database className="h-3 w-3 mr-2" />
+                      正在查询知识库...
+                    </span>
+                  )}
+                  {processingState === 'reasoning' && (
+                    <span className="text-xs text-purple-600 font-medium flex items-center">
+                      <Cpu className="h-3 w-3 mr-2 animate-spin" />
+                      正在进行深度推理...
+                    </span>
+                  )}
+                  {processingState === 'summarizing' && (
+                    <span className="text-xs text-green-600 font-medium flex items-center animate-pulse">
+                      <Sparkles className="h-3 w-3 mr-2 animate-pulse" />
+                      正在生成精确总结...
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-bl-none flex flex-col space-y-1 shadow-sm min-w-[150px]">
-                {processingState === 'analyzing_intent' && (
-                  <span className="text-xs text-blue-500 font-medium flex items-center animate-pulse">
-                    <BrainCircuit className="h-3 w-3 mr-2" />
-                    正在识别意图...
-                  </span>
-                )}
-                {processingState === 'reasoning' && (
-                  <span className="text-xs text-purple-600 font-medium flex items-center">
-                    <Cpu className="h-3 w-3 mr-2 animate-spin" />
-                    正在进行深度推理...
-                  </span>
-                )}
-                {processingState === 'summarizing' && (
-                  <span className="text-xs text-green-600 font-medium flex items-center animate-pulse">
-                    <Sparkles className="h-3 w-3 mr-2 animate-pulse" />
-                    正在生成精确总结...
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-          <div ref={scrollRef} />
-        </div>
+            )}
+            <div ref={scrollRef} />
+          </div>
 
-        <div className="p-8 pt-0">
-          <div className="glass p-2 rounded-2xl border border-gray-200 flex items-center space-x-2 shadow-lg bg-white/80 backdrop-blur-md">
-            <button className="p-3 text-gray-400 hover:text-black hover:bg-gray-100 rounded-xl transition-colors">
-              <Paperclip className="h-5 w-5" />
-            </button>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="描述您的课程需求..."
-              className="flex-1 bg-transparent border-none outline-none text-lg px-2 placeholder:text-gray-300"
-            />
+          <div className={`transition-all duration-500 ease-in-out ${isNewChat
+            ? 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl px-4'
+            : 'relative p-8 pt-0 w-full'
+            }`}>
+            <div className={`glass p-2 rounded-2xl border border-gray-200 flex items-center space-x-2 shadow-lg bg-white/80 backdrop-blur-md ${isNewChat ? 'shadow-xl' : ''}`}>
+              <button className="p-3 text-gray-400 hover:text-black hover:bg-gray-100 rounded-xl transition-colors">
+                <Paperclip className="h-5 w-5" />
+              </button>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    handleSend();
+                  }
+                }}
+                placeholder="描述您的课程需求..."
+                className="flex-1 bg-transparent border-none outline-none text-lg px-2 placeholder:text-gray-300"
+              />
 
-            <VoiceInput
-              onTranscriptUpdate={(text, isFinal) => {
-                if (isFinal) {
-                  const newMessage: Message = {
-                    id: generateId(),
-                    role: 'user',
-                    content: text,
-                    type: 'text',
-                    timestamp: new Date().toISOString()
-                  };
-                  setMessages(prev => [...prev, newMessage]);
-                  setIsTyping(true);
-                  setProcessingState('summarizing');
-                } else {
-                  setInput(text);
-                }
-              }}
-              onLLMMessage={(text, isFinal) => {
-                setMessages(prev => {
-                  const lastMsg = prev[prev.length - 1];
-                  const isLastAssistant = lastMsg?.role === 'assistant';
-
+              <VoiceInput
+                onTranscriptUpdate={(text, isFinal) => {
                   if (isFinal) {
-                    setIsTyping(false);
-                    setProcessingState('idle');
+                    const newMessage: Message = {
+                      id: generateId(),
+                      role: 'user',
+                      content: text,
+                      type: 'text',
+                      timestamp: new Date().toISOString()
+                    };
+                    setMessages(prev => [...prev, newMessage]);
+                    setIsTyping(true);
+                    setProcessingState('summarizing');
+                  } else {
+                    setInput(text);
+                  }
+                }}
+                onLLMMessage={(text, isFinal) => {
+                  setMessages(prev => {
+                    const lastMsg = prev[prev.length - 1];
+                    const isLastAssistant = lastMsg?.role === 'assistant';
+
+                    if (isFinal) {
+                      setIsTyping(false);
+                      setProcessingState('idle');
+                      if (isLastAssistant) {
+                        return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: text } : msg);
+                      }
+                      return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
+                    }
                     if (isLastAssistant) {
-                      return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: text } : msg);
+                      return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: msg.content + text } : msg);
                     }
                     return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
-                  }
-                  if (isLastAssistant) {
-                    return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: msg.content + text } : msg);
-                  }
-                  return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
-                });
-              }}
-            />
+                  });
+                }}
+              />
 
-            <button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="p-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-            >
-              <Send className="h-5 w-5" />
-            </button>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="p-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+              >
+                <Send className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

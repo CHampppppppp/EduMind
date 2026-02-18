@@ -253,13 +253,22 @@ class AIService:
             yield answer
 
     async def stream_chat(self, content: str, history: list, user_id: str = None):
-        # RAG Retrieval
+        # 1. Analyze Intent
+        yield {"type": "status", "content": "analyzing_intent"}
+        needs_reasoning = await self.check_intent(content)
+
+        # 2. RAG Retrieval
         yield {"type": "status", "content": "retrieving_knowledge"}
         
         # Local import to avoid circular dependency
         from app.services.knowledge_service import knowledge_service
         
-        relevant_docs = knowledge_service.query_knowledge(content, user_id=user_id)
+        # Run synchronous vector search in a separate thread to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        relevant_docs = await loop.run_in_executor(
+            None, 
+            lambda: knowledge_service.query_knowledge(content, n_results=3, user_id=user_id)
+        )
         
         rag_content = content
         if relevant_docs:
@@ -267,9 +276,7 @@ class AIService:
             rag_content = f"基于以下参考资料回答问题。如果参考资料不包含答案，请根据你的知识回答，但优先使用参考资料。\n\n参考资料：\n{context_str}\n\n用户问题：{content}"
             yield {"type": "status", "content": "knowledge_found"}
 
-        yield {"type": "status", "content": "analyzing_intent"}
-        needs_reasoning = await self.check_intent(content)
-        
+        # 3. Reasoning or Generating
         if needs_reasoning:
             yield {"type": "status", "content": "reasoning"}
             
