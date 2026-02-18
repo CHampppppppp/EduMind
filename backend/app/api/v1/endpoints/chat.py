@@ -1,38 +1,19 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Header
 from app.schemas.schemas import ChatRequest, Message, ChatSession
 from app.core.logger import logger
-from app.core.config import settings
 from app.core.database import get_db_connection
 from app.services.ai_service import ai_service
 import json
 import asyncio
-import os
 import uuid
 from typing import List, Optional
 
-try:
-    import dashscope
-    from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult
-except ImportError:
-    dashscope = None
-    logger.warning("DashScope not installed")
-
 router = APIRouter()
 
-def get_user_id_from_header(x_user_id: Optional[str] = Header(None)) -> Optional[str]:
-    """从请求头获取用户ID"""
-    return x_user_id
-
-def get_user_id_or_default(x_user_id: Optional[str] = Header(None)) -> str:
-    """获取用户ID，如果不存在则返回默认用户ID"""
-    return get_user_id_from_db_or_default(x_user_id)
-
-def get_user_id_from_db_or_default(x_user_id: Optional[str] = None) -> str:
-    """获取用户ID，如果不存在则返回默认用户ID（用于非FastAPI依赖注入场景）"""
+def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
     if x_user_id:
         return x_user_id
     
-    # 如果没有提供用户ID，尝试获取默认用户
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
@@ -40,7 +21,6 @@ def get_user_id_from_db_or_default(x_user_id: Optional[str] = None) -> str:
             row = cursor.fetchone()
             if row:
                 return row['id']
-            # 如果没有用户，创建一个默认用户
             user_id = str(uuid.uuid4())
             cursor.execute("INSERT INTO users (id, username, password_hash) VALUES (%s, 'default_user', 'default')", (user_id,))
             conn.commit()
@@ -53,22 +33,18 @@ def get_chat_history(chat_id: str, user_id: str, limit: int = 50) -> list:
     history = []
     try:
         with conn.cursor() as cursor:
-            # Check if chat exists and belongs to the user
             cursor.execute("SELECT id FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
             if not cursor.fetchone():
                 return []
             
-            # Get messages
-            sql = """
+            cursor.execute("""
                 SELECT role, content, model, thinking, created_at
                 FROM messages 
                 WHERE chat_id = %s 
                 ORDER BY created_at ASC 
                 LIMIT %s
-            """
-            cursor.execute(sql, (chat_id, limit))
-            results = cursor.fetchall()
-            for row in results:
+            """, (chat_id, limit))
+            for row in cursor.fetchall():
                 history.append({
                     "role": row['role'], 
                     "content": row['content'],
@@ -76,8 +52,6 @@ def get_chat_history(chat_id: str, user_id: str, limit: int = 50) -> list:
                     "thinking": row.get('thinking'),
                     "created_at": str(row['created_at'])
                 })
-    except Exception as e:
-        logger.error(f"Error fetching chat history: {e}")
     finally:
         conn.close()
     return history
@@ -87,74 +61,57 @@ def get_user_chats(user_id: str, days: int = 3) -> List[ChatSession]:
     chats = []
     try:
         with conn.cursor() as cursor:
-            sql = """
+            cursor.execute("""
                 SELECT id, title, created_at
                 FROM chats
                 WHERE user_id = %s AND created_at >= NOW() - INTERVAL %s DAY
                 ORDER BY created_at DESC
-            """
-            cursor.execute(sql, (user_id, days))
-            results = cursor.fetchall()
-            for row in results:
+            """, (user_id, days))
+            for row in cursor.fetchall():
                 chats.append(ChatSession(
                     id=row['id'],
                     title=row['title'] or "New Chat",
                     created_at=str(row['created_at'])
                 ))
-    except Exception as e:
-        logger.error(f"Error fetching chats: {e}")
     finally:
         conn.close()
     return chats
 
 @router.get("/history", response_model=List[ChatSession])
 async def get_history(days: int = 3, x_user_id: Optional[str] = Header(None)):
-    user_id = get_user_id_or_default(x_user_id)
-    return get_user_chats(user_id, days)
+    return get_user_chats(get_user_id(x_user_id), days)
 
 @router.delete("/{chat_id}")
 async def delete_chat(chat_id: str, x_user_id: Optional[str] = Header(None)):
-    """删除指定对话"""
-    user_id = get_user_id_or_default(x_user_id)
+    user_id = get_user_id(x_user_id)
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # 先删除该聊天下的所有消息
             cursor.execute("DELETE FROM messages WHERE chat_id = %s", (chat_id,))
-            # 再删除聊天会话
             cursor.execute("DELETE FROM chats WHERE id = %s AND user_id = %s", (chat_id, user_id))
             conn.commit()
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Chat not found")
             return {"message": "Chat deleted successfully"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting chat: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete chat")
     finally:
         conn.close()
 
 @router.get("/{chat_id}/messages", response_model=List[Message])
 async def get_messages(chat_id: str, x_user_id: Optional[str] = Header(None)):
-    user_id = get_user_id_or_default(x_user_id)
+    user_id = get_user_id(x_user_id)
     history = get_chat_history(chat_id, user_id, limit=100)
     return [Message(**msg, chat_id=chat_id) for msg in history]
-
 
 def save_message(chat_id: str, role: str, content: str, model: str = None, thinking: str = None):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
             msg_id = str(uuid.uuid4())
-            sql = """
+            cursor.execute("""
                 INSERT INTO messages (id, chat_id, role, content, model, thinking)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(sql, (msg_id, chat_id, role, content, model, thinking))
+            """, (msg_id, chat_id, role, content, model, thinking))
         conn.commit()
-    except Exception as e:
-        logger.error(f"Error saving message: {e}")
     finally:
         conn.close()
 
@@ -166,56 +123,33 @@ def create_chat_session(title: str = "New Chat", user_id: str = None) -> str:
     chat_id = str(uuid.uuid4())
     try:
         with conn.cursor() as cursor:
-            sql = "INSERT INTO chats (id, user_id, title) VALUES (%s, %s, %s)"
-            cursor.execute(sql, (chat_id, user_id, title))
+            cursor.execute("INSERT INTO chats (id, user_id, title) VALUES (%s, %s, %s)", (chat_id, user_id, title))
         conn.commit()
         return chat_id
-    except Exception as e:
-        logger.error(f"Error creating chat session: {e}")
-        raise e
     finally:
         conn.close()
 
 @router.post("", response_model=Message)
 async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
-    logger.info(f"REST Chat request received: {request.content}")
-    
-    user_id = get_user_id_or_default(x_user_id)
+    user_id = get_user_id(x_user_id)
     chat_id = request.chat_id
+    
     if not chat_id:
-        # Create new chat
         try:
-            # 如果 content 为空，使用默认标题
             title = request.content[:20] if request.content else "新对话"
             chat_id = create_chat_session(title=title, user_id=user_id)
         except Exception as e:
             logger.error(f"Failed to create chat session: {e}")
-            # Fallback to stateless if DB fails
             chat_id = None
     
-    # Save user message if we have a chat_id and content is not empty
     if chat_id and request.content:
         save_message(chat_id, "user", request.content)
         
-    # 如果 content 为空，只返回 chat_id，不调用 AI 服务
     if not request.content:
         return Message(role="assistant", content="", chat_id=chat_id)
 
     try:
-        # Use provided history if available, otherwise fetch from DB if chat_id exists?
-        # For REST, usually provided history is preferred for stateless-like behavior with state.
-        # But if we want persistence, we should probably merge or use one.
-        # Let's use request.history if provided, otherwise fetch from DB.
         history = request.history
-        if not history and chat_id:
-             # Exclude the just added message to avoid duplication if we fetched it?
-             # Actually get_chat_history fetches everything. 
-             # AI service expects history WITHOUT current message usually? 
-             # Or generic history.
-             # Let's just pass request.history for now to be safe with existing frontend.
-             pass
-
-        # Use AIService to process the chat (Full response for REST)
         result = await ai_service.process_chat_full(request.content, history)
         
         response = Message(
@@ -226,15 +160,19 @@ async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
             chat_id=chat_id
         )
         
-        # Save assistant message
         if chat_id:
             save_message(chat_id, "assistant", response.content, response.model, response.thinking)
             
-        logger.info(f"REST Chat response generated. Model: {response.model}")
         return response
     except Exception as e:
         logger.error(f"Error in REST chat: {e}")
         return Message(role="assistant", content="抱歉，服务器暂时遇到问题，请稍后再试。", chat_id=chat_id)
+
+try:
+    import dashscope
+    from dashscope.audio.asr import Recognition, RecognitionCallback, RecognitionResult
+except ImportError:
+    dashscope = None
 
 class WebSocketASRCallback(RecognitionCallback):
     def __init__(self, websocket: WebSocket, loop):
@@ -242,72 +180,46 @@ class WebSocketASRCallback(RecognitionCallback):
         self.loop = loop
         self.transcribed_text = ""
 
-    def on_open(self) -> None:
-        logger.info("ASR Session Started")
-
-    def on_close(self) -> None:
-        logger.info("ASR Session Closed")
-
     def on_event(self, result: RecognitionResult) -> None:
         sentence = result.get_sentence()
         if 'text' in sentence:
             text = sentence['text']
-            # Send partial result
             asyncio.run_coroutine_threadsafe(
                 self.websocket.send_json({"type": "asr_partial", "content": text}),
                 self.loop
             )
             if result.is_sentence_end(sentence):
                 self.transcribed_text += text
-                # Send sentence result
                 asyncio.run_coroutine_threadsafe(
                     self.websocket.send_json({"type": "asr_final", "content": text}),
                     self.loop
                 )
 
     def on_error(self, result: RecognitionResult) -> None:
-        logger.error(f"ASR Error: {result}")
         asyncio.run_coroutine_threadsafe(
              self.websocket.send_json({"type": "error", "content": str(result)}),
              self.loop
         )
 
 async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = None, user_id: str = None):
-    logger.info(f"Processing LLM request via WebSocket for: {text}, chat_id: {chat_id}, user_id: {user_id}")
-    
-    # 如果没有 user_id，获取默认用户
     if not user_id:
-        user_id = get_user_id_from_db_or_default(None)
+        user_id = get_user_id(None)
     
     await websocket.send_json({"type": "llm_start", "content": ""})
     
-    # If chat_id not provided, try to create one with user_id
     if not chat_id:
         try:
-            logger.info(f"Creating new chat session for user: {user_id}")
             chat_id = create_chat_session(title=text[:20], user_id=user_id)
-            logger.info(f"Chat session created successfully: {chat_id}")
-            # Send chat_id back to client
             await websocket.send_json({"type": "chat_info", "chat_id": chat_id})
         except Exception as e:
-            logger.error(f"Failed to create chat session: {e}", exc_info=True)
-            # 继续尝试处理，不要直接退出
+            logger.error(f"Failed to create chat session: {e}")
             
-    # Save user message
     if chat_id:
         save_message(chat_id, "user", text)
 
-        # Fetch history if chat_id exists
     history = []
     if chat_id:
-        # Get last 10 messages, excluding the one we just saved?
-        # Actually get_chat_history sorts ASC.
-        # We need to exclude the current message from history passed to LLM context usually.
-        # But stream_chat logic might handle it.
-        # Let's just fetch simplified history.
         full_history = get_chat_history(chat_id, user_id, limit=20)
-        # Convert to format expected by AI service (list of dicts with role/content)
-        # We should exclude the very last user message which is 'text'
         if full_history and full_history[-1]['content'] == text:
              history = full_history[:-1]
         else:
@@ -317,41 +229,32 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
     full_thinking = ""
     current_model = "unknown"
 
-    # Helper function to safely send JSON
     async def safe_send(data: dict) -> bool:
         try:
             await websocket.send_json(data)
             return True
-        except Exception as e:
-            logger.warning(f"WebSocket connection closed, cannot send message: {e}")
+        except Exception:
             return False
 
     try:
-        # Use AIService Streaming
         async for event in ai_service.stream_chat(text, history):
-            # Pass through the event directly to WebSocket
-            # Event types: status, thinking_chunk, thinking_done, llm_chunk, llm_end
-            logger.info(f"AI service event: {event['type']}")
             if event["type"] == "llm_chunk":
-                # Ensure content is not empty
                 if event["content"]:
                     full_response += event["content"]
                     if not await safe_send(event):
-                        break  # Exit loop if WebSocket is closed
+                        break
                 if "model" in event:
                     current_model = event["model"]
             elif event["type"] == "thinking_chunk":
                 full_thinking += event["content"]
-                # Send thinking chunk to frontend for streaming display
                 if not await safe_send(event):
                     break
             elif event["type"] == "thinking_done":
                 pass
             else:
                 if not await safe_send(event):
-                    break  # Exit loop if WebSocket is closed
+                    break
         
-        # Save assistant response
         if chat_id:
             save_message(chat_id, "assistant", full_response, current_model, full_thinking)
             
@@ -362,16 +265,7 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     loop = asyncio.get_event_loop()
-    logger.info("Chat WebSocket connected")
     
-    # Use settings instead of os.getenv
-    api_key = settings.DASHSCOPE_API_KEY
-    
-    if dashscope and api_key:
-        dashscope.api_key = api_key
-    else:
-        logger.warning("DASHSCOPE_API_KEY not set or dashscope not installed. ASR will fail.")
-
     recognition = None
     callback = None
     
@@ -380,9 +274,7 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 message = await websocket.receive()
             except RuntimeError as e:
-                # WebSocket connection has been closed/disconnected
                 if "disconnect message has been received" in str(e):
-                    logger.info("WebSocket disconnected by client")
                     break
                 raise
             
@@ -399,7 +291,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     msg_type = data.get("type")
                     
                     if msg_type == "start_recording":
-                        if dashscope and api_key:
+                        if dashscope:
                             callback = WebSocketASRCallback(websocket, loop)
                             recognition = Recognition(
                                 model='paraformer-realtime-v1',
@@ -408,31 +300,25 @@ async def websocket_endpoint(websocket: WebSocket):
                                 callback=callback
                             )
                             recognition.start()
-                            logger.info("ASR Started")
                         else:
                             await websocket.send_json({"type": "error", "content": "ASR not configured"})
                             
                     elif msg_type == "stop_recording":
                         if recognition:
                             recognition.stop()
-                            logger.info("ASR Stopped")
                             final_text = callback.transcribed_text
                             recognition = None
-                            
-                            # Do NOT trigger LLM automatically
-                            # Just confirm stop
                             await websocket.send_json({"type": "asr_stopped", "content": final_text})
                                 
                     elif msg_type == "text_message":
                         chat_id = data.get("chat_id")
-                        user_id = data.get("user_id") or get_user_id_from_db_or_default(None)
+                        user_id = data.get("user_id") or get_user_id(None)
                         await process_llm_request(websocket, data.get("content"), chat_id, user_id)
                         
                 except json.JSONDecodeError:
                     pass
             
     except WebSocketDisconnect:
-        logger.info("Chat WebSocket disconnected")
         if recognition:
             try:
                 recognition.stop()

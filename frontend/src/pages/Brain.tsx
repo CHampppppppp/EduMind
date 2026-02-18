@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Target, Users, Clock, Layers, FileText, CheckCircle, Sparkles, Cpu } from 'lucide-react';
 import type { AIModel } from '@/types';
 
@@ -27,18 +26,14 @@ const mockAnalysis = {
 export function Brain() {
   return (
     <div className="space-y-8">
-      <header className="flex justify-between items-end">
+      <header className="px-8 py-6 flex justify-between items-center border-b border-gray-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
         <div>
-          <motion.h1 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-4xl font-light tracking-tight"
-          >
+          <h1 className="text-4xl font-light tracking-tight">
             分析与意图
-          </motion.h1>
-          <p className="mt-2 text-muted-foreground">理解您的教学目标并构建内容结构。</p>
+          </h1>
+          <p className="text-sm text-muted-foreground">理解您的教学目标并构建内容结构。</p>
         </div>
-        
+
         <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-full border border-gray-200 shadow-sm text-sm text-gray-600">
           <span className="text-gray-400">分析模型:</span>
           {mockAnalysis.modelUsed === 'kimi-k2.5' ? (
@@ -55,101 +50,86 @@ export function Brain() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Intent Card */}
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.1 }}
-          className="glass p-8 rounded-2xl border border-white/20 shadow-sm"
-        >
-          <div className="flex items-center mb-6">
-            <div className="p-3 bg-black text-white rounded-xl mr-4">
-              <Target className="h-6 w-6" />
-            </div>
-            <h2 className="text-2xl font-medium">核心意图</h2>
-          </div>
-          
-          <div className="space-y-6">
-            <div className="flex items-start">
-              <Users className="h-5 w-5 text-gray-400 mt-1 mr-3" />
-              <div>
-                <span className="text-sm text-gray-400 block uppercase tracking-wider font-medium">受众</span>
-                <p className="text-lg">{mockAnalysis.intent.audience}</p>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="glass p-4 rounded-2xl border border-white/20 shadow-sm">
+            <div className="flex items-center mb-4">
+              <div className="p-2 bg-black text-white rounded-lg mr-3">
+                <Target className="h-5 w-5" />
               </div>
-            </div>
-            
-            <div className="flex items-start">
-              <Clock className="h-5 w-5 text-gray-400 mt-1 mr-3" />
-              <div>
-                <span className="text-sm text-gray-400 block uppercase tracking-wider font-medium">时长</span>
-                <p className="text-lg">{mockAnalysis.intent.duration} 分钟</p>
-              </div>
+              <h2 className="text-xl font-medium">核心意图</h2>
             </div>
 
-            <div className="flex items-start">
-              <Layers className="h-5 w-5 text-gray-400 mt-1 mr-3" />
-              <div>
-                <span className="text-sm text-gray-400 block uppercase tracking-wider font-medium">风格</span>
-                <p className="text-lg">{mockAnalysis.intent.style}</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Structure Card */}
-        <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass p-8 rounded-2xl border border-white/20 shadow-sm"
-        >
-          <div className="flex items-center mb-6">
-            <div className="p-3 bg-gray-100 text-black rounded-xl mr-4">
-              <FileText className="h-6 w-6" />
-            </div>
-            <h2 className="text-2xl font-medium">生成结构</h2>
-          </div>
-
-          <div className="space-y-6 relative">
-            <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-gray-100"></div>
-            {mockAnalysis.structure.map((item, index) => (
-              <div key={index} className="relative pl-10">
-                <div className="absolute left-0 top-1 w-6 h-6 bg-white border-2 border-black rounded-full flex items-center justify-center z-10">
-                  <span className="text-[10px] font-bold">{index + 1}</span>
+            <div className="space-y-4">
+              <div className="flex items-start">
+                <Users className="h-4 w-4 text-gray-400 mt-1 mr-2" />
+                <div>
+                  <span className="text-xs text-gray-400 block uppercase tracking-wider font-medium">受众</span>
+                  <p className="text-sm">{mockAnalysis.intent.audience}</p>
                 </div>
-                <h3 className="text-lg font-medium mb-1">{item.section}</h3>
-                <ul className="space-y-1">
-                  {item.points.map((point, i) => (
-                    <li key={i} className="text-muted-foreground text-sm flex items-center">
-                      <div className="w-1.5 h-1.5 bg-gray-300 rounded-full mr-2"></div>
-                      {point}
-                    </li>
-                  ))}
-                </ul>
               </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="glass p-6 rounded-2xl border border-green-100 bg-green-50/50 flex items-center justify-between"
-      >
-        <div className="flex items-center">
-          <CheckCircle className="h-6 w-6 text-green-600 mr-4" />
-          <div>
-            <h3 className="font-medium text-green-900">准备生成</h3>
-            <p className="text-sm text-green-700">所有关键点已映射到可用素材。</p>
+              <div className="flex items-start">
+                <Clock className="h-4 w-4 text-gray-400 mt-1 mr-2" />
+                <div>
+                  <span className="text-xs text-gray-400 block uppercase tracking-wider font-medium">时长</span>
+                  <p className="text-sm">{mockAnalysis.intent.duration} 分钟</p>
+                </div>
+              </div>
+
+              <div className="flex items-start">
+                <Layers className="h-4 w-4 text-gray-400 mt-1 mr-2" />
+                <div>
+                  <span className="text-xs text-gray-400 block uppercase tracking-wider font-medium">风格</span>
+                  <p className="text-sm">{mockAnalysis.intent.style}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass p-4 rounded-2xl border border-white/20 shadow-sm">
+            <div className="flex items-center mb-4">
+              <div className="p-2 bg-gray-100 text-black rounded-lg mr-3">
+                <FileText className="h-5 w-5" />
+              </div>
+              <h2 className="text-xl font-medium">生成结构</h2>
+            </div>
+
+            <div className="space-y-3 relative">
+              <div className="absolute left-2 top-2 bottom-2 w-0.5 bg-gray-100"></div>
+              {mockAnalysis.structure.map((item, index) => (
+                <div key={index} className="relative pl-8">
+                  <div className="absolute left-0 top-0 w-5 h-5 bg-white border-2 border-black rounded-full flex items-center justify-center z-10">
+                    <span className="text-[8px] font-bold">{index + 1}</span>
+                  </div>
+                  <h3 className="text-sm font-medium mb-1">{item.section}</h3>
+                  <ul className="space-y-0.5">
+                    {item.points.map((point, i) => (
+                      <li key={i} className="text-muted-foreground text-xs flex items-center">
+                        <div className="w-1 h-1 bg-gray-300 rounded-full mr-1.5"></div>
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <button className="bg-black text-white px-6 py-2 rounded-xl hover:bg-gray-800 transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
-          生成内容
-        </button>
-      </motion.div>
+
+        <div className="glass p-3 rounded-2xl border border-green-100 bg-green-50/50 flex items-center justify-between">
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
+            <div>
+              <h3 className="font-medium text-green-900 text-sm">准备生成</h3>
+              <p className="text-xs text-green-700">所有关键点已映射到可用素材。</p>
+            </div>
+          </div>
+          <button className="bg-black text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 text-sm transition-colors">
+            生成内容
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { Upload, FileText, Video, Image as ImageIcon, Music, File as FileIcon, Loader2, Trash2 } from 'lucide-react';
 import type { KnowledgeItem } from '@/types';
@@ -21,7 +21,7 @@ export function KnowledgeBase() {
       if (user && user.id) {
         headers['X-User-Id'] = user.id;
       }
-      
+
       const response = await fetch('/api/v1/knowledge', { headers });
       if (response.ok) {
         const data = await response.json();
@@ -47,13 +47,12 @@ export function KnowledgeBase() {
     if (!file) return;
 
     setIsUploading(true);
-    setUploadProgress(10); // Start progress
+    setUploadProgress(10);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      // Simulate progress for UX since fetch doesn't support progress events easily
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 500);
@@ -78,7 +77,6 @@ export function KnowledgeBase() {
         setItems(prev => [newItem, ...prev]);
       } else {
         console.error("Upload failed");
-        // Show error toast or something
       }
     } catch (error) {
       console.error("Upload error:", error);
@@ -92,7 +90,6 @@ export function KnowledgeBase() {
   };
 
   const handleDelete = async (id: string) => {
-    // Show toast with confirmation action
     toast("确定要删除这个文件吗？", {
       description: "这将同时删除云端和本地的记录，且无法恢复。",
       action: {
@@ -105,7 +102,7 @@ export function KnowledgeBase() {
             if (user && user.id) {
               headers['X-User-Id'] = user.id;
             }
-            
+
             const response = await fetch(`/api/v1/knowledge/${id}`, {
               method: 'DELETE',
               headers
@@ -154,13 +151,9 @@ export function KnowledgeBase() {
       <div className="space-y-8 relative min-h-full">
         <header className="flex justify-between items-center">
           <div>
-            <motion.h1
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-4xl font-light tracking-tight"
-            >
+            <h1 className="text-4xl font-light tracking-tight">
               知识库
-            </motion.h1>
+            </h1>
             <p className="mt-2 text-muted-foreground">管理您的教学素材和资源。</p>
           </div>
           <div className="flex gap-2">
@@ -182,13 +175,9 @@ export function KnowledgeBase() {
           </div>
         </header>
 
-        {/* Upload Progress Overlay */}
         <AnimatePresence>
           {isUploading && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+            <div
               className="fixed bottom-8 right-8 w-80 bg-white border border-gray-200 shadow-xl rounded-2xl p-4 z-50"
             >
               <div className="flex justify-between items-center mb-2">
@@ -196,13 +185,12 @@ export function KnowledgeBase() {
                 <span className="text-xs text-muted-foreground">{uploadProgress}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <motion.div
+                <div
                   className="h-full bg-black"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${uploadProgress}%` }}
+                  style={{ width: `${uploadProgress}%` }}
                 />
               </div>
-            </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
@@ -211,19 +199,12 @@ export function KnowledgeBase() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid gap-4"
-          >
+          <div className="grid gap-4">
             <AnimatePresence>
               {items.map((item) => (
-                <motion.div
+                <div
                   key={item.id}
-                  layoutId={item.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="group glass p-6 rounded-xl border border-white/20 hover:border-black/10 transition-all flex items-center justify-between"
+                  className="glass p-6 rounded-xl border border-white/20 hover:border-black/10 transition-all flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-4">
                     <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${getColorClass(item.type)}`}>
@@ -262,10 +243,10 @@ export function KnowledgeBase() {
                       )}
                     </button>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </AnimatePresence>
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

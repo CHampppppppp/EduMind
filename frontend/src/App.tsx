@@ -24,10 +24,10 @@ function App() {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/knowledge" element={<KnowledgeBase />} />
-                  <Route path="/chat" element={<Interface />} />
-                  <Route path="/analysis" element={<Brain />} />
-                  <Route path="/generate" element={<Factory />} />
+                  <Route path="/knowledgeBase" element={<KnowledgeBase />} />
+                  <Route path="/interface" element={<Interface />} />
+                  <Route path="/brain" element={<Brain />} />
+                  <Route path="/factory" element={<Factory />} />
                 </Routes>
               </Layout>
             } />

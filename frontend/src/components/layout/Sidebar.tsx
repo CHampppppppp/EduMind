@@ -8,10 +8,10 @@ interface SidebarProps {
 
 const navItems = [
   { icon: Home, label: '工作台', path: '/' },
-  { icon: Database, label: '知识库', path: '/knowledge' },
-  { icon: MessageSquare, label: '对话交互', path: '/chat' },
-  { icon: Brain, label: '意图理解', path: '/analysis' },
-  { icon: Layers, label: '课件工厂', path: '/generate' },
+  { icon: Database, label: '知识库', path: '/knowledgeBase' },
+  { icon: MessageSquare, label: '对话交互', path: '/interface' },
+  { icon: Brain, label: '意图理解', path: '/brain' },
+  { icon: Layers, label: '课件工厂', path: '/factory' },
 ];
 
 
