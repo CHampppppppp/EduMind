@@ -6,6 +6,7 @@ import { KnowledgeBase } from '@/pages/KnowledgeBase';
 import { Interface } from '@/pages/Interface';
 import { Brain } from '@/pages/Brain';
 import { Factory } from '@/pages/Factory';
+import { NotFound } from '@/pages/NotFound';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import { UserProvider } from '@/context/UserContext';
@@ -28,6 +29,7 @@ function App() {
                   <Route path="/interface" element={<Interface />} />
                   <Route path="/brain" element={<Brain />} />
                   <Route path="/factory" element={<Factory />} />
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </Layout>
             } />
