@@ -205,12 +205,16 @@ export function Interface() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("Current chatId state:", chatId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Current chatId state:", chatId);
+      }
       // 延迟一点发送，确保连接完全建立
       setTimeout(() => {
         if (ws.readyState === WebSocket.OPEN) {
           const user = getStoredUser();
-          console.log("Sending message with:", { chat_id: chatId, user_id: user?.id });
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Sending message with:", { chat_id: chatId, user_id: user?.id });
+          }
           ws.send(JSON.stringify({
             type: "text_message",
             content: newMessage.content,
@@ -230,12 +234,17 @@ export function Interface() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log("WS Message:", data);
+        // 只在开发环境打印简短日志，避免频繁打印大数据
+        if (process.env.NODE_ENV === 'development') {
+          console.log("WS Type:", data.type);
+        }
         if (data.type === 'chat_info') {
           setChatId(data.chat_id);
           fetchHistory();
         } else if (data.type === 'status') {
-          console.log("Received status:", data.content);
+          if (process.env.NODE_ENV === 'development') {
+            console.log("Status:", data.content);
+          }
           if (data.content === 'analyzing_intent') setProcessingState('analyzing_intent');
           // else if (data.content === 'reasoning') setProcessingState('reasoning'); // Hide reasoning state
           else if (data.content === 'reasoning') setProcessingState('reasoning'); // Show reasoning state
@@ -301,10 +310,18 @@ export function Interface() {
                 thinking: m.thinking
               } : m);
             } else {
-              // 不再创建新的 temp-ai，而是更新现有的
-              // 如果没有 temp-ai，说明逻辑有问题，需要记录错误
-              console.warn('llm_chunk received but no temp-ai message exists');
-              return prev;
+              // 如果没有 temp-ai，创建一个新的 assistant 消息
+              if (process.env.NODE_ENV === 'development') {
+                console.log('Creating temp-ai message for llm_chunk');
+              }
+              return [...prev, {
+                id: 'temp-ai',
+                role: 'assistant',
+                content: currentContent,
+                type: 'text',
+                timestamp: new Date().toISOString(),
+                model: data.model || 'deepseek-v3-reasoner'
+              }];
             }
           });
         } else if (data.type === 'llm_end') {
@@ -345,7 +362,9 @@ export function Interface() {
     };
 
     ws.onclose = (e) => {
-      console.log("WebSocket closed:", e.code, e.reason);
+      if (process.env.NODE_ENV === 'development') {
+        console.log("WebSocket closed:", e.code, e.reason);
+      }
       // 如果连接正常关闭且不是错误状态，不做处理
     };
   };
