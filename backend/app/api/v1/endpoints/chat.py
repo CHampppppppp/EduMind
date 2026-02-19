@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Header
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Header, UploadFile, File
 from app.schemas.schemas import ChatRequest, Message, ChatSession
 from app.core.logger import logger
 from app.core.database import get_db_connection
@@ -6,6 +6,8 @@ from app.services.ai_service import ai_service
 import json
 import asyncio
 import uuid
+import os
+import tempfile
 from typing import List, Optional
 
 router = APIRouter()
@@ -115,6 +117,15 @@ def save_message(chat_id: str, role: str, content: str, model: str = None, think
     finally:
         conn.close()
 
+def update_chat_title(chat_id: str, title: str):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE chats SET title = %s WHERE id = %s", (title, chat_id))
+        conn.commit()
+    finally:
+        conn.close()
+
 def create_chat_session(title: str = "New Chat", user_id: str = None) -> str:
     if not user_id:
         raise ValueError("User ID is required")
@@ -129,6 +140,37 @@ def create_chat_session(title: str = "New Chat", user_id: str = None) -> str:
     finally:
         conn.close()
 
+@router.post("/upload_file")
+async def upload_file(
+    file: UploadFile = File(...), 
+    x_user_id: Optional[str] = Header(None)
+):
+    user_id = get_user_id(x_user_id)
+    logger.info(f"Uploading file for chat: {file.filename}, user: {user_id}")
+    
+    file_ext = os.path.splitext(file.filename)[1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+        
+    try:
+        # Use ai_service to extract content
+        content, file_id = await ai_service.get_document_content(tmp_path)
+        
+        return {
+            "filename": file.filename,
+            "content": content,
+            "file_id": file_id
+        }
+    except Exception as e:
+        logger.error(f"File upload failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        # Clean up local temp file
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
 @router.post("", response_model=Message)
 async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
     user_id = get_user_id(x_user_id)
@@ -136,7 +178,8 @@ async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
     
     if not chat_id:
         try:
-            title = request.content[:20] if request.content else "新对话"
+            # Use first 10 chars as title
+            title = request.content[:10] if request.content else "新对话"
             chat_id = create_chat_session(title=title, user_id=user_id)
         except Exception as e:
             logger.error(f"Failed to create chat session: {e}")
@@ -257,6 +300,19 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
         
         if chat_id:
             save_message(chat_id, "assistant", full_response, current_model, full_thinking)
+            
+            # Generate dynamic title
+            try:
+                # Use user input text to generate title
+                new_title = await ai_service.generate_title(text)
+                if new_title:
+                    logger.info(f"Updating chat {chat_id} title to: {new_title}")
+                    update_chat_title(chat_id, new_title)
+                    await safe_send({"type": "chat_info", "chat_id": chat_id, "title": new_title})
+                else:
+                    logger.warning("Generated title was empty")
+            except Exception as e:
+                logger.error(f"Failed to update title: {e}")
             
     except Exception as e:
         logger.error(f"Error in WebSocket LLM process: {e}")

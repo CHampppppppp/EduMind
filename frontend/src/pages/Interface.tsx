@@ -1,13 +1,28 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Send, Paperclip, Bot, Sparkles, BrainCircuit, Plus, History, Trash2, User, Cpu, Database } from 'lucide-react';
+import { Send, Paperclip, Bot, Sparkles, BrainCircuit, Plus, History, Trash2, User, Cpu, Database, Loader2, X, FileText } from 'lucide-react';
 import type { Message, ChatSession } from '@/types';
 import { VoiceInput } from '@/components/VoiceInput';
 import { StreamMarkdown } from '@/components/StreamMarkdown';
 import { authFetch } from '@/lib/auth';
-import { FadeIn, SlideUp, ScaleIn } from '@/components/ui/motion';
+import { FadeIn, SlideUp } from '@/components/ui/motion';
+import { toast } from 'sonner';
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+const parseMessageContent = (content: string) => {
+  if (content.startsWith('我上传了一个文件作为参考：')) {
+    const filenameMatch = content.match(/文件名：(.*?)\n/);
+    const filename = filenameMatch ? filenameMatch[1] : null;
+
+    const marker = '用户问题：';
+    const index = content.lastIndexOf(marker);
+    const cleanText = index !== -1 ? content.substring(index + marker.length).trim() : content;
+
+    return { filename, cleanText };
+  }
+  return { filename: null, cleanText: content };
+};
 
 export function Interface() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,6 +39,10 @@ export function Interface() {
   const [history, setHistory] = useState<ChatSession[]>([]);
   const isInitialized = useRef(false);
   const skipNextLoadChat = useRef(false);
+
+  const [attachedFile, setAttachedFile] = useState<{ name: string, content: string } | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cleanupWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -166,18 +185,50 @@ export function Interface() {
     }
   }, [messages, isTyping, processingState]);
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingFile(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await authFetch('/api/v1/chat/upload_file', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAttachedFile({ name: data.filename, content: data.content });
+        toast.success("文件解析成功");
+      } else {
+        toast.error("文件解析失败");
+      }
+    } catch (err) {
+      console.error("Upload failed", err);
+      toast.error("上传失败");
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim()) return;
+    if (!input.trim() && !attachedFile) return;
+
+    let finalInput = input;
+    if (attachedFile) {
+      finalInput = `我上传了一个文件作为参考：\n文件名：${attachedFile.name}\n文件内容：\n${attachedFile.content}\n\n用户问题：${input}`;
+      setAttachedFile(null);
+    }
 
     let currentChatId = chatId;
 
     if (!chatId) {
-      const newChatId = await initChatSession();
-      if (!newChatId) return;
+      // Don't create session immediately, let WebSocket handle it
       skipNextLoadChat.current = true;
-      setChatId(newChatId);
-      setSearchParams({ id: newChatId }, { replace: true });
-      currentChatId = newChatId;
     }
 
     cleanupWebSocket();
@@ -185,7 +236,7 @@ export function Interface() {
     const newMessage: Message = {
       id: generateId(),
       role: 'user',
-      content: input,
+      content: finalInput, // Use finalInput which contains file context
       type: 'text',
       timestamp: new Date().toISOString()
     };
@@ -220,8 +271,34 @@ export function Interface() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'chat_info') {
-          setChatId(data.chat_id);
-          fetchHistory();
+          const newChatId = data.chat_id;
+          if (newChatId !== currentChatId) {
+            skipNextLoadChat.current = true;
+            setChatId(newChatId);
+            setSearchParams({ id: newChatId }, { replace: true });
+            currentChatId = newChatId;
+          }
+
+          // Update history with real title from backend
+          if (data.title) {
+            setHistory(prev => {
+              const exists = prev.some(c => c.id === newChatId);
+              if (exists) {
+                return prev.map(chat =>
+                  chat.id === newChatId ? { ...chat, title: data.title } : chat
+                );
+              }
+              // Add new if not exists
+              return [{
+                id: newChatId,
+                title: data.title,
+                created_at: new Date().toISOString()
+              }, ...prev];
+            });
+          } else {
+            // If no title yet, refresh history to get default one
+            fetchHistory();
+          }
         } else if (data.type === 'status') {
           if (data.content === 'analyzing_intent') setProcessingState('analyzing_intent');
           else if (data.content === 'reasoning') setProcessingState('reasoning');
@@ -335,7 +412,10 @@ export function Interface() {
       </div>
 
       <div className="flex-1 flex flex-col h-full relative min-w-0 bg-background">
-        <header className="px-8 py-6 flex justify-between items-center border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-10">
+        <header className={`px-8 flex justify-between items-center bg-background/50 backdrop-blur-sm sticky top-0 z-10 transition-all duration-500 ease-in-out overflow-hidden ${isNewChat
+          ? 'py-6 border-b border-border opacity-100 max-h-[200px]'
+          : 'py-0 border-b-0 opacity-0 max-h-0'
+          }`}>
           <div>
             <h1 className="text-3xl font-light tracking-tight text-foreground">对话交互</h1>
             <p className="text-sm text-muted-foreground">与 EduMind 对话，创建您的教学计划。</p>
@@ -361,25 +441,40 @@ export function Interface() {
             ref={messagesContainerRef}
             className={`flex-1 overflow-y-auto space-y-8 p-8 custom-scrollbar overscroll-none scroll-smooth ${isNewChat ? 'invisible' : 'visible'}`}
           >
-            {messages.map((msg) => (
-              <SlideUp key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`flex items-end max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-3`}>
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                    {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                  </div>
-                  <div className="flex flex-col items-start w-full min-w-0">
-                    <div className={`p-4 rounded-2xl shadow-sm w-full overflow-hidden ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-card border border-border text-card-foreground rounded-bl-none'}`}>
-                      <div className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-primary-foreground' : 'text-card-foreground'}`}>
-                        <StreamMarkdown content={msg.content} />
-                      </div>
-                      <div className="text-[10px] mt-2 opacity-70 uppercase tracking-wider font-medium text-current">
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {messages.map((msg) => {
+              const { filename, cleanText } = msg.role === 'user' ? parseMessageContent(msg.content) : { filename: null, cleanText: msg.content };
+
+              return (
+                <SlideUp key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex items-end max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-3`}>
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                      {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                    </div>
+                    <div className="flex flex-col items-start w-full min-w-0">
+                      <div className={`p-4 rounded-2xl shadow-sm w-full overflow-hidden ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-card border border-border text-card-foreground rounded-bl-none'}`}>
+                        {filename && (
+                          <div className="flex items-center space-x-3 bg-primary-foreground/10 p-3 rounded-xl mb-3 border border-primary-foreground/10 backdrop-blur-sm">
+                            <div className="bg-primary-foreground/20 p-2 rounded-lg">
+                              <FileText className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col overflow-hidden">
+                              <span className="text-xs opacity-70 mb-0.5">附件</span>
+                              <span className="text-sm font-medium truncate max-w-[200px]">{filename}</span>
+                            </div>
+                          </div>
+                        )}
+                        <div className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-primary-foreground' : 'text-card-foreground'}`}>
+                          <StreamMarkdown content={cleanText} />
+                        </div>
+                        <div className="text-[10px] mt-2 opacity-70 uppercase tracking-wider font-medium text-current">
+                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </SlideUp>
-            ))}
+                </SlideUp>
+              );
+            })}
 
             {isTyping && (
               <div className="flex justify-start items-end space-x-3">
@@ -418,71 +513,103 @@ export function Interface() {
           </div>
 
           <div className={`transition-all duration-500 ease-in-out ${isNewChat
-            ? 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl px-4'
+            ? 'absolute top-1/2 left-0 right-0 mx-auto -translate-y-1/2 w-full max-w-3xl px-4'
             : 'relative p-8 pt-0 w-full'
             }`}>
-            <div className={`glass p-2 rounded-2xl border border-border flex items-center space-x-2 shadow-lg bg-background/80 backdrop-blur-md ${isNewChat ? 'shadow-xl' : ''}`}>
-              <button className="p-3 text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors">
-                <Paperclip className="h-5 w-5" />
-              </button>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                    handleSend();
-                  }
-                }}
-                placeholder="描述您的课程需求..."
-                className="flex-1 bg-transparent border-none outline-none text-lg px-2 placeholder:text-muted-foreground/50 text-foreground"
-              />
+            <div className={`glass p-2 rounded-2xl border border-border flex flex-col space-y-2 shadow-lg bg-background/80 backdrop-blur-md ${isNewChat ? 'shadow-xl' : ''}`}>
+              {attachedFile && (
+                <div className="flex items-center justify-between bg-muted/50 p-2 rounded-lg mx-2 mt-2">
+                  <div className="flex items-center space-x-2 overflow-hidden">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <span className="text-sm truncate max-w-[200px]">{attachedFile.name}</span>
+                  </div>
+                  <button
+                    onClick={() => setAttachedFile(null)}
+                    className="p-1 hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
 
-              <VoiceInput
-                onTranscriptUpdate={(text, isFinal) => {
-                  if (isFinal) {
-                    const newMessage: Message = {
-                      id: generateId(),
-                      role: 'user',
-                      content: text,
-                      type: 'text',
-                      timestamp: new Date().toISOString()
-                    };
-                    setMessages(prev => [...prev, newMessage]);
-                    setIsTyping(true);
-                    setProcessingState('summarizing');
-                  } else {
-                    setInput(text);
-                  }
-                }}
-                onLLMMessage={(text, isFinal) => {
-                  setMessages(prev => {
-                    const lastMsg = prev[prev.length - 1];
-                    const isLastAssistant = lastMsg?.role === 'assistant';
+              <div className="flex items-center space-x-2 w-full">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.txt,.md"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile}
+                  className="p-3 text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-colors relative"
+                >
+                  {isUploadingFile ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                  ) : (
+                    <Paperclip className="h-5 w-5" />
+                  )}
+                </button>
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                      handleSend();
+                    }
+                  }}
+                  placeholder="描述您的课程需求..."
+                  className="flex-1 bg-transparent border-none outline-none text-lg px-2 placeholder:text-muted-foreground/50 text-foreground"
+                />
 
+                <VoiceInput
+                  onTranscriptUpdate={(text, isFinal) => {
                     if (isFinal) {
-                      setIsTyping(false);
-                      setProcessingState('idle');
+                      const newMessage: Message = {
+                        id: generateId(),
+                        role: 'user',
+                        content: text,
+                        type: 'text',
+                        timestamp: new Date().toISOString()
+                      };
+                      setMessages(prev => [...prev, newMessage]);
+                      setIsTyping(true);
+                      setProcessingState('summarizing');
+                    } else {
+                      setInput(text);
+                    }
+                  }}
+                  onLLMMessage={(text, isFinal) => {
+                    setMessages(prev => {
+                      const lastMsg = prev[prev.length - 1];
+                      const isLastAssistant = lastMsg?.role === 'assistant';
+
+                      if (isFinal) {
+                        setIsTyping(false);
+                        setProcessingState('idle');
+                        if (isLastAssistant) {
+                          return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: text } : msg);
+                        }
+                        return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
+                      }
                       if (isLastAssistant) {
-                        return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: text } : msg);
+                        return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: msg.content + text } : msg);
                       }
                       return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
-                    }
-                    if (isLastAssistant) {
-                      return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: msg.content + text } : msg);
-                    }
-                    return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
-                  });
-                }}
-              />
+                    });
+                  }}
+                />
 
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="p-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
-              >
-                <Send className="h-5 w-5" />
-              </button>
+                <button
+                  onClick={handleSend}
+                  disabled={(!input.trim() && !attachedFile) || isUploadingFile}
+                  className="p-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                >
+                  <Send className="h-5 w-5" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

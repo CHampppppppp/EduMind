@@ -28,7 +28,11 @@ export async function authFetch(url: string, options: RequestInit = {}) {
   const user = getStoredUser();
   
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  
+  // Only set Content-Type to application/json if it's not FormData
+  if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   
   if (user && user.id) {
     headers.set("X-User-Id", user.id);

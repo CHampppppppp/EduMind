@@ -206,7 +206,15 @@ class AIService:
     async def stream_kimi_response(self, content: str, history: list = []):
         try:
             messages = [{"role": "system", "content": "你是 EduMind 智能教研助手，专门辅助教师进行教学工作。你的职责是协助教师设计课程、优化教案、解答教学难题以及提供创新的教学思路。你的回答应当专业、高效、具有建设性，并视用户为教育领域的同行专家。"}]
-            messages.extend(history[-10:])
+            
+            # Filter out messages with empty content to avoid API errors
+            valid_history = [
+                {"role": msg["role"], "content": msg["content"]} 
+                for msg in history[-10:] 
+                if msg.get("content") and str(msg.get("content")).strip()
+            ]
+            messages.extend(valid_history)
+            
             messages.append({"role": "user", "content": content})
             
             response = await self.kimi_client.chat.completions.create(
@@ -341,5 +349,33 @@ class AIService:
         except Exception as e:
             logger.error(f"Error deleting file from Kimi {file_id}: {e}")
             return False
+
+    async def generate_title(self, content: str) -> str:
+        if not content or not content.strip():
+            return "新对话"
+
+        try:
+            # Truncate content if too long to save tokens
+            truncated_content = content[:500]
+            response = await self.kimi_client.chat.completions.create(
+                model=self.kimi_model,
+                messages=[
+                    {"role": "system", "content": "你是一个助手，请根据用户的输入生成一个简短的对话标题（不超过10个字）。不要使用引号，直接返回标题内容。如果用户输入过于简短，则使用用户的输入作为标题。"},
+                    {"role": "user", "content": f"请为以下内容生成一个标题：\n{truncated_content}"}
+                ],
+                max_tokens=20,
+                temperature=1.0
+            )
+            title = response.choices[0].message.content.strip()
+            # Clean up title
+            title = title.replace('"', '').replace("'", "").replace("标题：", "")
+            
+            if not title:
+                return "新对话"
+                
+            return title
+        except Exception as e:
+            logger.error(f"Error generating title: {e}")
+            return "新对话"
 
 ai_service = AIService()
