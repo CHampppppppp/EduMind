@@ -204,13 +204,13 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage, onRecordingStart 
         onClick={toggleRecording}
         disabled={readyState !== ReadyState.OPEN}
         className={`relative p-2 rounded-full transition-all duration-300 shadow-lg flex items-center justify-center ${isRecording
-          ? 'bg-red-500 hover:bg-red-600 text-white'
-          : 'bg-white hover:bg-gray-100 text-black border border-gray-200'
+          ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+          : 'bg-background hover:bg-muted text-foreground border border-border'
           } ${readyState !== ReadyState.OPEN ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={readyState !== ReadyState.OPEN ? "正在连接服务器..." : isRecording ? "停止录音" : "开始语音对话"}
       >
         {isRecording && (
-          <span className="absolute w-full h-full rounded-full bg-red-400 opacity-75 animate-ping"></span>
+          <span className="absolute w-full h-full rounded-full bg-destructive opacity-75 animate-ping"></span>
         )}
         {isRecording ? <Square className="h-5 w-5 z-10" /> : <Mic className="h-5 w-5 z-10" />}
       </button>

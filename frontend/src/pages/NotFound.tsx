@@ -8,11 +8,11 @@ export function NotFound() {
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-primary/5 to-accent/10" />
-      <div className="absolute -top-32 -left-32 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br from-black/5 to-transparent blur-3xl" />
+      <div className="absolute -top-32 -left-32 w-[32rem] h-[32rem] rounded-full bg-gradient-to-br from-primary/5 to-transparent blur-3xl" />
       <div className="absolute -bottom-40 -right-40 w-[40rem] h-[40rem] rounded-full bg-gradient-to-tl from-primary/10 to-transparent blur-3xl" />
  
       <div className="relative z-10 h-full flex items-center justify-center p-8">
-        <div className={cn("glass rounded-3xl max-w-3xl w-full border border-white/20 shadow-xl")}>
+        <div className={cn("glass rounded-3xl max-w-3xl w-full border border-border shadow-xl")}>
           <div className="px-10 pt-10">
             <div className="relative">
               <div className="absolute inset-0 blur-xl opacity-60">
@@ -20,7 +20,7 @@ export function NotFound() {
                   404
                 </div>
               </div>
-              <div className="text-[8rem] leading-none font-black tracking-tighter bg-gradient-to-r from-black to-muted bg-clip-text text-transparent">
+              <div className="text-[8rem] leading-none font-black tracking-tighter bg-gradient-to-r from-foreground to-muted bg-clip-text text-transparent">
                 404
               </div>
             </div>
@@ -38,7 +38,7 @@ export function NotFound() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <button
                 onClick={() => navigate(-1)}
-                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border bg-secondary hover:bg-black hover:text-white transition-all"
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-border bg-secondary hover:bg-primary hover:text-primary-foreground transition-all"
               >
                 <ArrowLeft className="h-5 w-5" />
                 返回上一页

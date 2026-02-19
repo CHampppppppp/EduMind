@@ -145,7 +145,7 @@ export function KnowledgeBase() {
     if (type === 'video') return 'bg-blue-50 text-blue-500 group-hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:group-hover:bg-blue-900/30';
     if (type === 'audio') return 'bg-yellow-50 text-yellow-500 group-hover:bg-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-400 dark:group-hover:bg-yellow-900/30';
     if (type === 'pdf') return 'bg-red-50 text-red-500 group-hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:group-hover:bg-red-900/30';
-    return 'bg-gray-50 text-gray-500 group-hover:bg-gray-100 dark:bg-gray-800/50 dark:text-gray-400 dark:group-hover:bg-gray-800';
+    return 'bg-muted text-muted-foreground group-hover:bg-accent';
   };
 
   return (
@@ -153,7 +153,7 @@ export function KnowledgeBase() {
       <div className="space-y-8 relative min-h-full">
         <FadeIn delay={0.1} className="flex justify-between items-center">
           <div>
-            <h1 className="text-4xl font-light tracking-tight dark:text-white">
+            <h1 className="text-4xl font-light tracking-tight text-foreground">
               知识库
             </h1>
             <p className="mt-2 text-muted-foreground">管理您的教学素材和资源。</p>
@@ -169,7 +169,7 @@ export function KnowledgeBase() {
             <button
               onClick={handleUploadClick}
               disabled={isUploading}
-              className="bg-black text-white px-6 py-3 rounded-xl font-medium flex items-center hover:bg-gray-800 transition-colors disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+              className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-medium flex items-center hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Upload className="mr-2 h-5 w-5" />}
               {isUploading ? '正在上传...' : '上传新文件'}
@@ -183,15 +183,15 @@ export function KnowledgeBase() {
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-8 right-8 w-80 bg-white border border-gray-200 shadow-xl rounded-2xl p-4 z-50 dark:bg-black/90 dark:border-white/10"
+              className="fixed bottom-8 right-8 w-80 bg-popover border border-border shadow-xl rounded-2xl p-4 z-50"
             >
               <div className="flex justify-between items-center mb-2">
-                <span className="font-medium text-sm">正在上传文件...</span>
+                <span className="font-medium text-sm text-foreground">正在上传文件...</span>
                 <span className="text-xs text-muted-foreground">{uploadProgress}%</span>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden dark:bg-white/10">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-black dark:bg-white"
+                  className="h-full bg-primary"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
@@ -211,14 +211,14 @@ export function KnowledgeBase() {
                   key={item.id}
                   layout
                   exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                  className="glass dark:glass-dark p-6 rounded-xl hover:border-black/10 transition-all flex items-center justify-between dark:hover:border-white/20"
+                  className="glass p-6 rounded-xl border border-border hover:border-primary/20 transition-all flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-4">
                     <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-colors ${getColorClass(item.type)}`}>
                       {getIcon(item.type)}
                     </div>
                     <div>
-                      <h3 className="font-medium text-lg dark:text-white">{item.title}</h3>
+                      <h3 className="font-medium text-lg text-foreground">{item.title}</h3>
                       <div className="text-sm text-muted-foreground flex items-center gap-1">
                         <span>{new Date(item.uploadDate).toLocaleDateString()}</span>
                         <span>•</span>
@@ -240,7 +240,7 @@ export function KnowledgeBase() {
                     <button
                       onClick={() => handleDelete(item.id)}
                       disabled={deletingId === item.id}
-                      className="p-2 hover:bg-red-50 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"
+                      className="p-2 hover:bg-destructive/10 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
                       title="删除"
                     >
                       {deletingId === item.id ? (

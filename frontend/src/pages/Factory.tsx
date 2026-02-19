@@ -53,10 +53,10 @@ export function Factory() {
   if (isLoading) {
     return (
       <FadeIn className="h-full flex flex-col items-center justify-center space-y-4">
-        <div className="bg-white p-4 rounded-full shadow-lg border border-gray-100 animate-bounce">
-          <Loader2 className="h-8 w-8 animate-spin text-black" />
+        <div className="bg-card p-4 rounded-full shadow-lg border border-border animate-bounce">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-        <p className="text-gray-500 font-medium animate-pulse">正在生成教学内容...</p>
+        <p className="text-muted-foreground font-medium animate-pulse">正在生成教学内容...</p>
       </FadeIn>
     );
   }
@@ -64,19 +64,19 @@ export function Factory() {
   if (!content) {
     return (
       <ScaleIn className="h-full flex flex-col items-center justify-center p-8 text-center space-y-8">
-        <div className="bg-gray-50 p-8 rounded-full ring-1 ring-gray-100 shadow-sm">
-          <Box className="h-16 w-16 text-gray-300" />
+        <div className="bg-muted p-8 rounded-full ring-1 ring-border shadow-sm">
+          <Box className="h-16 w-16 text-muted-foreground/50" />
         </div>
         <div className="max-w-md space-y-3">
-          <h3 className="text-2xl font-light text-gray-900">暂无生成内容</h3>
-          <p className="text-gray-500 leading-relaxed">
+          <h3 className="text-2xl font-light text-foreground">暂无生成内容</h3>
+          <p className="text-muted-foreground leading-relaxed">
             您的教学材料工厂目前是空的。<br/>
             请前往对话页面生成内容，或点击下方按钮查看示例。
           </p>
         </div>
         <button 
           onClick={handleGenerateExample}
-          className="bg-black text-white px-8 py-3 rounded-xl font-medium hover:bg-gray-800 transition-all hover:scale-105 shadow-xl shadow-black/10 flex items-center group"
+          className="bg-primary text-primary-foreground px-8 py-3 rounded-xl font-medium hover:bg-primary/90 transition-all hover:scale-105 shadow-xl shadow-primary/10 flex items-center group"
         >
           <Sparkles className="mr-2 h-4 w-4 group-hover:animate-pulse" />
           生成示例内容
@@ -100,32 +100,32 @@ export function Factory() {
 
   return (
     <div className="h-full flex flex-col p-8 container mx-auto max-w-7xl custom-scrollbar">
-      <FadeIn delay={0.1} className="mb-6 flex justify-between items-center border-b border-gray-100 pb-4">
+      <FadeIn delay={0.1} className="mb-6 flex justify-between items-center border-b border-border pb-4">
         <div>
-          <h1 className="text-3xl font-light tracking-tight">课件工厂</h1>
+          <h1 className="text-3xl font-light tracking-tight text-foreground">课件工厂</h1>
           <p className="text-sm text-muted-foreground">预览并导出生成的教学材料。</p>
         </div>
-        <div className="flex space-x-2 bg-gray-100 p-1 rounded-xl">
+        <div className="flex space-x-2 bg-muted p-1 rounded-xl">
           <button
             onClick={() => setView('slides')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === 'slides' ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === 'slides' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             演示文稿
           </button>
           <button
             onClick={() => setView('lesson')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === 'lesson' ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === 'lesson' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             教案
           </button>
           <button
             onClick={() => setView('game')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === 'game' ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-black'}`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${view === 'game' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             互动游戏
           </button>
         </div>
-        <button className="bg-black text-white px-4 py-2 rounded-xl flex items-center hover:bg-gray-800 transition-colors shadow-sm">
+        <button className="bg-primary text-primary-foreground px-4 py-2 rounded-xl flex items-center hover:bg-primary/90 transition-colors shadow-sm">
           <Download className="mr-2 h-4 w-4" />
           导出
         </button>
@@ -140,45 +140,45 @@ export function Factory() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="h-full w-full flex flex-col items-center justify-center bg-gray-50 rounded-2xl border border-gray-200 p-8 relative overflow-hidden"
+              className="h-full w-full flex flex-col items-center justify-center bg-muted/30 rounded-2xl border border-border p-8 relative overflow-hidden"
             >
-              <div className="aspect-video w-full max-w-4xl bg-white shadow-2xl rounded-xl flex flex-col p-12 relative overflow-hidden group">
+              <div className="aspect-video w-full max-w-4xl bg-card shadow-2xl rounded-xl flex flex-col p-12 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-8 opacity-10">
-                  <div className="text-9xl font-bold">0{currentSlide + 1}</div>
+                  <div className="text-9xl font-bold text-foreground">0{currentSlide + 1}</div>
                 </div>
 
-                <h2 className="text-5xl font-bold mb-8 tracking-tight">{slide.title}</h2>
-                <div className="prose prose-lg max-w-none flex-1">
-                  <p className="text-xl text-gray-600 leading-relaxed whitespace-pre-wrap">{slide.content}</p>
+                <h2 className="text-5xl font-bold mb-8 tracking-tight text-card-foreground">{slide.title}</h2>
+                <div className="prose prose-lg max-w-none flex-1 dark:prose-invert">
+                  <p className="text-xl text-muted-foreground leading-relaxed whitespace-pre-wrap">{slide.content}</p>
                 </div>
 
                 {slide.image && (
-                  <div className="mt-4 h-48 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                  <div className="mt-4 h-48 bg-muted rounded-lg flex items-center justify-center text-muted-foreground">
                     [图片占位符: {slide.image}]
                   </div>
                 )}
 
-                <div className="mt-auto pt-8 border-t border-gray-100 flex justify-between text-sm text-gray-400 uppercase tracking-widest">
+                <div className="mt-auto pt-8 border-t border-border flex justify-between text-sm text-muted-foreground uppercase tracking-widest">
                   <span>EduMind 生成器</span>
                   <span>{new Date().toLocaleDateString()}</span>
                 </div>
               </div>
 
-              <div className="absolute bottom-8 flex space-x-4 bg-white/80 backdrop-blur-md p-2 rounded-full shadow-lg border border-gray-200 z-10">
+              <div className="absolute bottom-8 flex space-x-4 bg-card/80 backdrop-blur-md p-2 rounded-full shadow-lg border border-border z-10">
                 <button
                   onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
                   disabled={currentSlide === 0}
-                  className="p-3 hover:bg-gray-100 rounded-full disabled:opacity-30 transition-colors"
+                  className="p-3 hover:bg-muted rounded-full disabled:opacity-30 transition-colors text-foreground"
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
-                <span className="flex items-center font-medium px-4 min-w-[3rem] justify-center">
+                <span className="flex items-center font-medium px-4 min-w-[3rem] justify-center text-foreground">
                   {currentSlide + 1} / {content.slides.length}
                 </span>
                 <button
                   onClick={() => setCurrentSlide(prev => Math.min(content.slides.length - 1, prev + 1))}
                   disabled={currentSlide === content.slides.length - 1}
-                  className="p-3 hover:bg-gray-100 rounded-full disabled:opacity-30 transition-colors"
+                  className="p-3 hover:bg-muted rounded-full disabled:opacity-30 transition-colors text-foreground"
                 >
                   <ChevronRight className="h-6 w-6" />
                 </button>
@@ -186,20 +186,20 @@ export function Factory() {
 
               <button
                 onClick={() => setIsEditMode(!isEditMode)}
-                className={`absolute top-8 right-8 p-3 rounded-xl transition-all shadow-sm border group z-10 ${isEditMode ? 'bg-black text-white border-black' : 'bg-white/80 backdrop-blur-md border-gray-200 hover:bg-white'}`}
+                className={`absolute top-8 right-8 p-3 rounded-xl transition-all shadow-sm border group z-10 ${isEditMode ? 'bg-primary text-primary-foreground border-primary' : 'bg-card/80 backdrop-blur-md border-border hover:bg-card'}`}
               >
-                {isEditMode ? <X className="h-5 w-5" /> : <Edit2 className="h-5 w-5 text-gray-500 group-hover:text-black" />}
+                {isEditMode ? <X className="h-5 w-5" /> : <Edit2 className="h-5 w-5 text-muted-foreground group-hover:text-foreground" />}
               </button>
 
               <AnimatePresence>
                 {isEditMode && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className="absolute top-20 right-8 w-96 glass p-4 rounded-2xl border border-white/20 shadow-xl z-20"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="absolute top-20 right-8 w-96 glass p-4 rounded-2xl border border-border shadow-xl z-20"
                   >
-                    <div className="flex items-center mb-3 text-sm font-medium text-gray-500">
+                    <div className="flex justify-between items-center mb-4">
                       <Sparkles className="h-4 w-4 mr-2 text-purple-500" />
                       AI 修改
                     </div>
@@ -208,15 +208,15 @@ export function Factory() {
                         value={editPrompt}
                         onChange={(e) => setEditPrompt(e.target.value)}
                         placeholder="描述如何修改此幻灯片..."
-                        className="w-full bg-white/50 border border-gray-200 rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-black/5 resize-none h-24"
+                        className="w-full bg-background/50 border border-border rounded-xl p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/5 resize-none h-24 text-foreground"
                         disabled={isGenerating}
                       />
                       <button
                         onClick={handleModify}
                         disabled={!editPrompt.trim() || isGenerating}
-                        className="absolute bottom-3 right-3 p-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                        className="absolute bottom-3 right-3 p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                       >
-                        {isGenerating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+                        {isGenerating ? <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
                       </button>
                     </div>
                   </motion.div>
@@ -232,10 +232,10 @@ export function Factory() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="h-full w-full overflow-y-auto bg-white rounded-2xl border border-gray-200 p-12 shadow-sm max-w-4xl mx-auto"
+              className="h-full w-full overflow-y-auto bg-card rounded-2xl border border-border p-12 shadow-sm max-w-4xl mx-auto"
             >
-              <article className="prose prose-slate max-w-none">
-                <div dangerouslySetInnerHTML={{ __html: content.lessonPlan.replace(/\n/g, '<br/>').replace(/# (.*)/g, '<h1 class="text-4xl font-bold mb-6">$1</h1>').replace(/## (.*)/g, '<h2 class="text-2xl font-semibold mt-8 mb-4">$1</h2>') }} />
+              <article className="prose prose-slate dark:prose-invert max-w-none text-card-foreground">
+                <div dangerouslySetInnerHTML={{ __html: content.lessonPlan.replace(/\n/g, '<br/>').replace(/# (.*)/g, '<h1 class="text-4xl font-bold mb-6 text-foreground">$1</h1>').replace(/## (.*)/g, '<h2 class="text-2xl font-semibold mt-8 mb-4 text-foreground">$1</h2>') }} />
               </article>
             </motion.div>
           )}

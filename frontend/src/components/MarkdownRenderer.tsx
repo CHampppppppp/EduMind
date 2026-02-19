@@ -25,7 +25,7 @@ export const MarkdownRenderer = memo(({ content }: MarkdownRendererProps) => {
               {String(children).replace(/\n$/, '')}
             </SyntaxHighlighter>
           ) : (
-            <code className={`${className} bg-gray-100 dark:bg-gray-800 rounded px-1 py-0.5`} {...props}>
+            <code className={`${className} bg-muted rounded px-1 py-0.5`} {...props}>
               {children}
             </code>
           );
@@ -38,29 +38,29 @@ export const MarkdownRenderer = memo(({ content }: MarkdownRendererProps) => {
         h2: ({ children }) => <h2 className="text-xl font-bold mb-3">{children}</h2>,
         h3: ({ children }) => <h3 className="text-lg font-bold mb-2">{children}</h3>,
         blockquote: ({ children }) => (
-          <blockquote className="border-l-4 border-gray-300 pl-4 italic my-2 text-gray-600 dark:text-gray-400">
+          <blockquote className="border-l-4 border-muted pl-4 italic my-2 text-muted-foreground">
             {children}
           </blockquote>
         ),
         a: ({ href, children }) => (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-500 dark:text-blue-400 hover:underline">
             {children}
           </a>
         ),
         table: ({ children }) => (
           <div className="overflow-x-auto my-4">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 border">
+            <table className="min-w-full divide-y divide-border border border-border">
               {children}
             </table>
           </div>
         ),
         th: ({ children }) => (
-          <th className="px-3 py-2 bg-gray-50 dark:bg-gray-800 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border">
+          <th className="px-3 py-2 bg-muted/50 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider border border-border">
             {children}
           </th>
         ),
         td: ({ children }) => (
-          <td className="px-3 py-2 whitespace-nowrap text-sm border dark:border-gray-700">
+          <td className="px-3 py-2 whitespace-nowrap text-sm border border-border">
             {children}
           </td>
         ),
