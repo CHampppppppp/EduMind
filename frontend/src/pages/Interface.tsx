@@ -5,6 +5,7 @@ import type { Message, ChatSession } from '@/types';
 import { VoiceInput } from '@/components/VoiceInput';
 import { StreamMarkdown } from '@/components/StreamMarkdown';
 import { authFetch } from '@/lib/auth';
+import { FadeIn, SlideUp, ScaleIn } from '@/components/ui/motion';
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -287,58 +288,60 @@ export function Interface() {
 
   return (
     <div className="flex h-full w-full">
-      <div className="w-64 border-r border-gray-200 bg-gray-50 flex flex-col p-4">
-        <button
-          onClick={startNewChat}
-          disabled={isTyping}
-          className={`flex items-center justify-center w-full px-4 py-2 rounded-lg transition-colors mb-6 shadow-sm ${isTyping ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-800'}`}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          发起新对话
-        </button>
+      <div className="w-64 border-r border-gray-200 bg-gray-50 flex flex-col p-4 dark:bg-black/20 dark:border-white/5">
+        <FadeIn delay={0.1} className="flex flex-col h-full">
+          <button
+            onClick={startNewChat}
+            disabled={isTyping}
+            className={`flex items-center justify-center w-full px-4 py-2 rounded-lg transition-colors mb-6 shadow-sm ${isTyping ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200'}`}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            发起新对话
+          </button>
 
-        <div className="flex items-center text-sm font-medium text-gray-500 mb-2 px-2">
-          <History className="h-4 w-4 mr-2" />
-          最近3天
-        </div>
+          <div className="flex items-center text-sm font-medium text-gray-500 mb-2 px-2 dark:text-gray-400">
+            <History className="h-4 w-4 mr-2" />
+            最近3天
+          </div>
 
-        <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
-          {history.length === 0 && (
-            <div className="text-xs text-gray-400 px-2 py-4 text-center">暂无历史记录</div>
-          )}
-          {history.map((chat) => (
-            <div
-              key={chat.id}
-              className={`group flex items-center justify-between px-3 py-2 rounded-lg text-sm truncate transition-colors ${isTyping ? 'opacity-50 cursor-not-allowed' : chatId === chat.id ? 'bg-white text-black shadow-sm font-medium' : 'text-gray-600 hover:bg-gray-200/50'}`}
-            >
-              <button
-                onClick={() => !isTyping && navigate(`/interface?id=${chat.id}`)}
-                disabled={isTyping}
-                className="flex-1 text-left truncate"
+          <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+            {history.length === 0 && (
+              <div className="text-xs text-gray-400 px-2 py-4 text-center">暂无历史记录</div>
+            )}
+            {history.map((chat) => (
+              <div
+                key={chat.id}
+                className={`group flex items-center justify-between px-3 py-2 rounded-lg text-sm truncate transition-colors ${isTyping ? 'opacity-50 cursor-not-allowed' : chatId === chat.id ? 'bg-white text-black shadow-sm font-medium dark:bg-white/10 dark:text-white' : 'text-gray-600 hover:bg-gray-200/50 dark:text-gray-400 dark:hover:bg-white/5'}`}
               >
-                {chat.title}
-              </button>
-              <button
-                onClick={(e) => deleteChat(chat.id, e)}
-                disabled={isTyping}
-                className={`opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all ${isTyping ? 'cursor-not-allowed' : ''}`}
-                title="删除对话"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
-              </button>
-            </div>
-          ))}
-        </div>
+                <button
+                  onClick={() => !isTyping && navigate(`/interface?id=${chat.id}`)}
+                  disabled={isTyping}
+                  className="flex-1 text-left truncate"
+                >
+                  {chat.title}
+                </button>
+                <button
+                  onClick={(e) => deleteChat(chat.id, e)}
+                  disabled={isTyping}
+                  className={`opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all ${isTyping ? 'cursor-not-allowed' : ''} dark:hover:bg-white/10`}
+                  title="删除对话"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </FadeIn>
       </div>
 
-      <div className="flex-1 flex flex-col h-full relative min-w-0 bg-white">
-        <header className="px-8 py-6 flex justify-between items-center border-b border-gray-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex-1 flex flex-col h-full relative min-w-0 bg-white dark:bg-background">
+        <header className="px-8 py-6 flex justify-between items-center border-b border-gray-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10 dark:border-white/5 dark:bg-black/20">
           <div>
-            <h1 className="text-3xl font-light tracking-tight">对话交互</h1>
+            <h1 className="text-3xl font-light tracking-tight dark:text-white">对话交互</h1>
             <p className="text-sm text-muted-foreground">与 EduMind 对话，创建您的教学计划。</p>
           </div>
           <div className="flex space-x-2">
-            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center">
+            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium flex items-center dark:bg-green-900/30 dark:text-green-400">
               <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
               在线
             </span>
@@ -349,8 +352,8 @@ export function Interface() {
           {/* Greeting - Only visible in new chat */}
           <div className={`absolute inset-0 flex flex-col items-center justify-center pb-40 transition-opacity duration-300 ${isNewChat ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <div className="bg-transparent p-4 rounded-3xl mb-8 flex items-center justify-center">
-              <Bot className="h-5 w-5 text-black mr-4" />
-              <h2 className="text-2xl font-medium text-gray-900">今天有什么可以帮到你？</h2>
+              <Bot className="h-5 w-5 text-black mr-4 dark:text-white" />
+              <h2 className="text-2xl font-medium text-gray-900 dark:text-white">今天有什么可以帮到你？</h2>
             </div>
           </div>
 
@@ -359,14 +362,14 @@ export function Interface() {
             className={`flex-1 overflow-y-auto space-y-8 p-8 custom-scrollbar overscroll-none scroll-smooth ${isNewChat ? 'invisible' : 'visible'}`}
           >
             {messages.map((msg) => (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <SlideUp key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex items-end max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-3`}>
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 text-black dark:bg-white/10 dark:text-white'}`}>
                     {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                   </div>
                   <div className="flex flex-col items-start w-full min-w-0">
-                    <div className={`p-4 rounded-2xl shadow-sm w-full overflow-hidden ${msg.role === 'user' ? 'bg-black text-white rounded-br-none' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none'}`}>
-                      <div className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-white' : 'text-gray-800 dark:text-gray-100'}`}>
+                    <div className={`p-4 rounded-2xl shadow-sm w-full overflow-hidden ${msg.role === 'user' ? 'bg-black text-white rounded-br-none dark:bg-white dark:text-black' : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none dark:bg-white/5 dark:border-white/10 dark:text-gray-100'}`}>
+                      <div className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-white dark:text-black' : 'text-gray-800 dark:text-gray-100'}`}>
                         <StreamMarkdown content={msg.content} />
                       </div>
                       <div className="text-[10px] mt-2 opacity-70 uppercase tracking-wider font-medium text-gray-400">
@@ -375,35 +378,35 @@ export function Interface() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </SlideUp>
             ))}
 
             {isTyping && (
               <div className="flex justify-start items-end space-x-3">
-                <div className="h-8 w-8 rounded-full bg-gray-100 text-black flex items-center justify-center flex-shrink-0">
+                <div className="h-8 w-8 rounded-full bg-gray-100 text-black flex items-center justify-center flex-shrink-0 dark:bg-white/10 dark:text-white">
                   <Bot className="h-4 w-4" />
                 </div>
-                <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-bl-none flex flex-col space-y-1 shadow-sm min-w-[150px]">
+                <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-bl-none flex flex-col space-y-1 shadow-sm min-w-[150px] dark:bg-white/5 dark:border-white/10">
                   {processingState === 'analyzing_intent' && (
-                    <span className="text-xs text-blue-500 font-medium flex items-center animate-pulse">
+                    <span className="text-xs text-blue-500 font-medium flex items-center animate-pulse dark:text-blue-400">
                       <BrainCircuit className="h-3 w-3 mr-2" />
                       正在识别意图...
                     </span>
                   )}
                   {processingState === 'retrieving_knowledge' && (
-                    <span className="text-xs text-orange-500 font-medium flex items-center animate-pulse">
+                    <span className="text-xs text-orange-500 font-medium flex items-center animate-pulse dark:text-orange-400">
                       <Database className="h-3 w-3 mr-2" />
                       正在查询知识库...
                     </span>
                   )}
                   {processingState === 'reasoning' && (
-                    <span className="text-xs text-purple-600 font-medium flex items-center">
+                    <span className="text-xs text-purple-600 font-medium flex items-center dark:text-purple-400">
                       <Cpu className="h-3 w-3 mr-2 animate-spin" />
                       正在进行深度推理...
                     </span>
                   )}
                   {processingState === 'summarizing' && (
-                    <span className="text-xs text-green-600 font-medium flex items-center animate-pulse">
+                    <span className="text-xs text-green-600 font-medium flex items-center animate-pulse dark:text-green-400">
                       <Sparkles className="h-3 w-3 mr-2 animate-pulse" />
                       正在生成精确总结...
                     </span>
@@ -418,8 +421,8 @@ export function Interface() {
             ? 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl px-4'
             : 'relative p-8 pt-0 w-full'
             }`}>
-            <div className={`glass p-2 rounded-2xl border border-gray-200 flex items-center space-x-2 shadow-lg bg-white/80 backdrop-blur-md ${isNewChat ? 'shadow-xl' : ''}`}>
-              <button className="p-3 text-gray-400 hover:text-black hover:bg-gray-100 rounded-xl transition-colors">
+            <div className={`glass p-2 rounded-2xl border border-gray-200 flex items-center space-x-2 shadow-lg bg-white/80 backdrop-blur-md ${isNewChat ? 'shadow-xl' : ''} dark:bg-black/40 dark:border-white/10 dark:shadow-none`}>
+              <button className="p-3 text-gray-400 hover:text-black hover:bg-gray-100 rounded-xl transition-colors dark:hover:text-white dark:hover:bg-white/10">
                 <Paperclip className="h-5 w-5" />
               </button>
               <input
@@ -432,7 +435,7 @@ export function Interface() {
                   }
                 }}
                 placeholder="描述您的课程需求..."
-                className="flex-1 bg-transparent border-none outline-none text-lg px-2 placeholder:text-gray-300"
+                className="flex-1 bg-transparent border-none outline-none text-lg px-2 placeholder:text-gray-300 dark:text-white dark:placeholder:text-gray-500"
               />
 
               <VoiceInput
@@ -476,7 +479,7 @@ export function Interface() {
               <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="p-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
+                className="p-3 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md dark:bg-white dark:text-black dark:hover:bg-gray-200"
               >
                 <Send className="h-5 w-5" />
               </button>

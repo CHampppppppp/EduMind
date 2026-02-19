@@ -1,5 +1,6 @@
 import { Target, Users, Clock, Layers, FileText, CheckCircle, Sparkles, Cpu } from 'lucide-react';
 import type { AIModel } from '@/types';
+import { FadeIn, SlideUp, StaggerContainer } from '@/components/ui/motion';
 
 const mockAnalysis = {
   intent: {
@@ -26,7 +27,7 @@ const mockAnalysis = {
 export function Brain() {
   return (
     <div className="space-y-8">
-      <header className="px-8 py-6 flex justify-between items-center border-b border-gray-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+      <FadeIn delay={0.1} className="px-8 py-6 flex justify-between items-center border-b border-gray-100 bg-white/50 backdrop-blur-sm sticky top-0 z-10">
         <div>
           <h1 className="text-4xl font-light tracking-tight">
             分析与意图
@@ -48,11 +49,11 @@ export function Brain() {
             </div>
           )}
         </div>
-      </header>
+      </FadeIn>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="glass p-4 rounded-2xl border border-white/20 shadow-sm">
+        <StaggerContainer delay={0.2} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SlideUp className="glass p-4 rounded-2xl border border-white/20 shadow-sm">
             <div className="flex items-center mb-4">
               <div className="p-2 bg-black text-white rounded-lg mr-3">
                 <Target className="h-5 w-5" />
@@ -85,9 +86,9 @@ export function Brain() {
                 </div>
               </div>
             </div>
-          </div>
+          </SlideUp>
 
-          <div className="glass p-4 rounded-2xl border border-white/20 shadow-sm">
+          <SlideUp className="glass p-4 rounded-2xl border border-white/20 shadow-sm">
             <div className="flex items-center mb-4">
               <div className="p-2 bg-gray-100 text-black rounded-lg mr-3">
                 <FileText className="h-5 w-5" />
@@ -114,10 +115,10 @@ export function Brain() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </SlideUp>
+        </StaggerContainer>
 
-        <div className="glass p-3 rounded-2xl border border-green-100 bg-green-50/50 flex items-center justify-between">
+        <FadeIn delay={0.4} className="glass p-3 rounded-2xl border border-green-100 bg-green-50/50 flex items-center justify-between">
           <div className="flex items-center">
             <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
             <div>
@@ -128,7 +129,7 @@ export function Brain() {
           <button className="bg-black text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 text-sm transition-colors">
             生成内容
           </button>
-        </div>
+        </FadeIn>
       </div>
     </div>
   );

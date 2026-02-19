@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Download, Edit2, X, Send, Sparkles, Box, Loader2 } from 'lucide-react';
 import type { GeneratedContent } from '@/types';
 import { GamePreview } from '@/components/GamePreview';
+import { ScaleIn, FadeIn } from '@/components/ui/motion';
 
 export function Factory() {
   const [content, setContent] = useState<GeneratedContent | null>(null);
@@ -51,18 +52,18 @@ export function Factory() {
 
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center space-y-4">
+      <FadeIn className="h-full flex flex-col items-center justify-center space-y-4">
         <div className="bg-white p-4 rounded-full shadow-lg border border-gray-100 animate-bounce">
           <Loader2 className="h-8 w-8 animate-spin text-black" />
         </div>
         <p className="text-gray-500 font-medium animate-pulse">正在生成教学内容...</p>
-      </div>
+      </FadeIn>
     );
   }
 
   if (!content) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-8 animate-in fade-in zoom-in duration-500">
+      <ScaleIn className="h-full flex flex-col items-center justify-center p-8 text-center space-y-8">
         <div className="bg-gray-50 p-8 rounded-full ring-1 ring-gray-100 shadow-sm">
           <Box className="h-16 w-16 text-gray-300" />
         </div>
@@ -80,7 +81,7 @@ export function Factory() {
           <Sparkles className="mr-2 h-4 w-4 group-hover:animate-pulse" />
           生成示例内容
         </button>
-      </div>
+      </ScaleIn>
     );
   }
 
@@ -99,7 +100,7 @@ export function Factory() {
 
   return (
     <div className="h-full flex flex-col p-8 container mx-auto max-w-7xl custom-scrollbar">
-      <header className="mb-6 flex justify-between items-center border-b border-gray-100 pb-4">
+      <FadeIn delay={0.1} className="mb-6 flex justify-between items-center border-b border-gray-100 pb-4">
         <div>
           <h1 className="text-3xl font-light tracking-tight">课件工厂</h1>
           <p className="text-sm text-muted-foreground">预览并导出生成的教学材料。</p>
@@ -128,12 +129,17 @@ export function Factory() {
           <Download className="mr-2 h-4 w-4" />
           导出
         </button>
-      </header>
+      </FadeIn>
 
       <div className="flex-1 overflow-hidden relative flex">
         <AnimatePresence mode="wait">
           {view === 'slides' && (
-            <div
+            <motion.div
+              key="slides"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
               className="h-full w-full flex flex-col items-center justify-center bg-gray-50 rounded-2xl border border-gray-200 p-8 relative overflow-hidden"
             >
               <div className="aspect-video w-full max-w-4xl bg-white shadow-2xl rounded-xl flex flex-col p-12 relative overflow-hidden group">
@@ -187,7 +193,10 @@ export function Factory() {
 
               <AnimatePresence>
                 {isEditMode && (
-                  <div
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
                     className="absolute top-20 right-8 w-96 glass p-4 rounded-2xl border border-white/20 shadow-xl z-20"
                   >
                     <div className="flex items-center mb-3 text-sm font-medium text-gray-500">
@@ -210,30 +219,40 @@ export function Factory() {
                         {isGenerating ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
-            </div>
+            </motion.div>
           )}
 
           {view === 'lesson' && (
-            <div
+            <motion.div
+              key="lesson"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
               className="h-full w-full overflow-y-auto bg-white rounded-2xl border border-gray-200 p-12 shadow-sm max-w-4xl mx-auto"
             >
               <article className="prose prose-slate max-w-none">
                 <div dangerouslySetInnerHTML={{ __html: content.lessonPlan.replace(/\n/g, '<br/>').replace(/# (.*)/g, '<h1 class="text-4xl font-bold mb-6">$1</h1>').replace(/## (.*)/g, '<h2 class="text-2xl font-semibold mt-8 mb-4">$1</h2>') }} />
               </article>
-            </div>
+            </motion.div>
           )}
 
           {view === 'game' && (
-            <div
+            <motion.div
+              key="game"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3 }}
               className="h-full w-full flex items-center justify-center"
             >
               <div className="w-full max-w-3xl">
                 <GamePreview />
               </div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

@@ -14,7 +14,7 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1 flex flex-col overflow-hidden pl-20 transition-all duration-300">
         <header className="flex justify-between items-center px-6 py-3 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-xl">
+            <div className="h-10 w-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-xl dark:bg-white dark:text-black">
               E
             </div>
             <span className="font-bold text-xl">
