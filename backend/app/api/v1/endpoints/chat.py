@@ -178,8 +178,7 @@ async def chat(request: ChatRequest, x_user_id: Optional[str] = Header(None)):
     
     if not chat_id:
         try:
-            # Use first 10 chars as title
-            title = request.content[:10] if request.content else "新对话"
+            title = request.content[:20] if request.content else "新对话"
             chat_id = create_chat_session(title=title, user_id=user_id)
         except Exception as e:
             logger.error(f"Failed to create chat session: {e}")
@@ -263,10 +262,19 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
     history = []
     if chat_id:
         full_history = get_chat_history(chat_id, user_id, limit=20)
+        logger.info(f"Full history length: {len(full_history)}")
+        if full_history:
+            logger.info(f"Last message in history: {full_history[-1]['content'][:20]}...")
+            logger.info(f"Current text: {text[:20]}...")
+            
         if full_history and full_history[-1]['content'] == text:
              history = full_history[:-1]
+             logger.info("Matched last message, using previous history.")
         else:
              history = full_history
+             logger.info("Did not match last message or history empty.")
+             
+    logger.info(f"Final history length for LLM: {len(history)}")
 
     full_response = ""
     full_thinking = ""
@@ -300,17 +308,21 @@ async def process_llm_request(websocket: WebSocket, text: str, chat_id: str = No
         
         if chat_id:
             save_message(chat_id, "assistant", full_response, current_model, full_thinking)
+            logger.info(f"Saved assistant message. Checking if title update is needed. History length: {len(history)}")
             
-            # Generate dynamic title
+            # Generate dynamic title for EVERY turn to keep it updated
+            logger.info("Generating title for chat...")
             try:
-                # Use user input text to generate title
-                new_title = await ai_service.generate_title(text)
-                if new_title:
+                # Use user input text AND assistant response to generate title
+                new_title = await ai_service.generate_title(text, full_response)
+                logger.info(f"Generated raw title: {new_title}")
+                
+                if new_title and new_title != "新对话":
                     logger.info(f"Updating chat {chat_id} title to: {new_title}")
                     update_chat_title(chat_id, new_title)
                     await safe_send({"type": "chat_info", "chat_id": chat_id, "title": new_title})
                 else:
-                    logger.warning("Generated title was empty")
+                    logger.warning(f"Generated title was empty or default: {new_title}")
             except Exception as e:
                 logger.error(f"Failed to update title: {e}")
             

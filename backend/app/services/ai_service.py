@@ -350,18 +350,56 @@ class AIService:
             logger.error(f"Error deleting file from Kimi {file_id}: {e}")
             return False
 
-    async def generate_title(self, content: str) -> str:
-        if not content or not content.strip():
+    def _clean_user_content(self, content: str) -> str:
+        """
+        Remove file upload context from user content to get the actual query.
+        """
+        if not content:
+            return ""
+            
+        marker = "用户问题："
+        if "我上传了一个文件作为参考：" in content and marker in content:
+            try:
+                index = content.rindex(marker)
+                return content[index + len(marker):].strip()
+            except ValueError:
+                pass
+        
+        return content
+
+    async def generate_title(self, content: str, answer: str = "") -> str:
+        clean_content = self._clean_user_content(content)
+        
+        # Helper function for fallback title
+        def get_fallback_title(text: str) -> str:
+            if not text:
+                return "新对话"
+            return text[:10]
+
+        if not clean_content or not clean_content.strip():
+            # If cleaned content is empty (e.g. only file uploaded), use filename or default
+            if "文件名：" in content:
+                try:
+                    import re
+                    match = re.search(r"文件名：(.*?)\n", content)
+                    if match:
+                        return f"分析：{match.group(1)}"
+                except:
+                    pass
             return "新对话"
 
         try:
             # Truncate content if too long to save tokens
-            truncated_content = content[:500]
+            truncated_content = clean_content[:200]
+            truncated_answer = answer[:200] if answer else ""
+            
+            prompt_content = f"用户问题：\n{truncated_content}\n\nAI回复：\n{truncated_answer}"
+            
             response = await self.kimi_client.chat.completions.create(
                 model=self.kimi_model,
                 messages=[
-                    {"role": "system", "content": "你是一个助手，请根据用户的输入生成一个简短的对话标题（不超过10个字）。不要使用引号，直接返回标题内容。如果用户输入过于简短，则使用用户的输入作为标题。"},
-                    {"role": "user", "content": f"请为以下内容生成一个标题：\n{truncated_content}"}
+                    {"role": "system", "content": "你是一个有创意的总结专家，擅长将长段段话用精炼的语言进行总结。请根据用户的输入和assistant的输出，生成一个简短的对话标题用来描述当前的对话内容（不超过15个字）。不要使用引号，直接返回标题内容。"},
+                    {"role": "user", "content": f"请为以下对话生成一个标题：\n{prompt_content}"}
                 ],
                 max_tokens=20,
                 temperature=1.0
@@ -371,11 +409,11 @@ class AIService:
             title = title.replace('"', '').replace("'", "").replace("标题：", "")
             
             if not title:
-                return "新对话"
+                return get_fallback_title(clean_content)
                 
             return title
         except Exception as e:
             logger.error(f"Error generating title: {e}")
-            return "新对话"
+            return get_fallback_title(clean_content)
 
 ai_service = AIService()
