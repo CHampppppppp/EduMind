@@ -288,7 +288,7 @@ export function Interface() {
 
   return (
     <div className="flex h-full w-full">
-      <div className="w-64 border-r border-border bg-sidebar flex flex-col p-4">
+      <div className="w-48 border-r border-border bg-sidebar flex flex-col p-4">
         <FadeIn delay={0.1} className="flex flex-col h-full">
           <button
             onClick={startNewChat}

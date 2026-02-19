@@ -28,7 +28,14 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Ensure user has an ID, otherwise consider invalid
+        if (parsedUser && parsedUser.id) {
+          setUser(parsedUser);
+        } else {
+          console.warn("Stored user invalid (missing id), clearing storage");
+          localStorage.removeItem("user");
+        }
       } catch (e) {
         console.error("Failed to parse user from local storage", e);
         localStorage.removeItem("user");

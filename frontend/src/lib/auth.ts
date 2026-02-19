@@ -10,7 +10,11 @@ export function getStoredUser() {
   const storedUser = localStorage.getItem("user");
   if (storedUser) {
     try {
-      return JSON.parse(storedUser);
+      const user = JSON.parse(storedUser);
+      if (user && user.id) {
+        return user;
+      }
+      return null;
     } catch (e) {
       console.error("Failed to parse user from local storage", e);
       return null;

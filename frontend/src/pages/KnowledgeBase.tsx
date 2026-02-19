@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Upload, FileText, Video, Image as ImageIcon, Music, File as FileIcon, Loader2, Trash2 } from 'lucide-react';
 import type { KnowledgeItem } from '@/types';
 import { MarkdownRenderer } from '@/components/MarkdownRenderer';
-import { getStoredUser } from '@/lib/auth';
+import { authFetch, getStoredUser } from '@/lib/auth';
 import { FadeIn, SlideUp, StaggerContainer } from '@/components/ui/motion';
 
 export function KnowledgeBase() {
@@ -16,14 +16,11 @@ export function KnowledgeBase() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchItems = async () => {
-    try {
-      const user = getStoredUser();
-      const headers: Record<string, string> = {};
-      if (user && user.id) {
-        headers['X-User-Id'] = user.id;
-      }
+    const user = getStoredUser();
+    if (!user) return;
 
-      const response = await fetch('/api/v1/knowledge', { headers });
+    try {
+      const response = await authFetch('/api/v1/knowledge');
       if (response.ok) {
         const data = await response.json();
         setItems(data);
@@ -98,15 +95,8 @@ export function KnowledgeBase() {
         onClick: async () => {
           setDeletingId(id);
           try {
-            const user = getStoredUser();
-            const headers: Record<string, string> = {};
-            if (user && user.id) {
-              headers['X-User-Id'] = user.id;
-            }
-
-            const response = await fetch(`/api/v1/knowledge/${id}`, {
-              method: 'DELETE',
-              headers
+            const response = await authFetch(`/api/v1/knowledge/${id}`, {
+              method: 'DELETE'
             });
 
             if (response.ok) {
