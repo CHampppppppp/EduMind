@@ -1,12 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Send, Paperclip, Bot, Sparkles, BrainCircuit, Plus, History, Trash2, User, Cpu, Database, Loader2, X, FileText } from 'lucide-react';
+import { Send, Paperclip, Bot, Sparkles, BrainCircuit, Plus, History, Trash2, User, Cpu, Database, Loader2, X, FileText, Menu, Home, MessageSquare, Layers, Sun, Moon, LogOut } from 'lucide-react';
 import type { Message, ChatSession } from '@/types';
 import { VoiceInput } from '@/components/VoiceInput';
 import { StreamMarkdown } from '@/components/StreamMarkdown';
 import { authFetch } from '@/lib/auth';
 import { FadeIn, SlideUp } from '@/components/ui/motion';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useTheme } from 'next-themes';
+import { AnimatedThemeToggler } from '@/components/ui/animated-theme-toggler';
+import { useUser } from '@/context/UserContext';
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -25,6 +31,8 @@ const parseMessageContent = (content: string) => {
 };
 
 export function Interface() {
+  const { logout } = useUser();
+  const { theme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -37,12 +45,14 @@ export function Interface() {
   const initialChatId = searchParams.get('id');
   const [chatId, setChatId] = useState<string | null>(initialChatId);
   const [history, setHistory] = useState<ChatSession[]>([]);
-  const isInitialized = useRef(false);
   const skipNextLoadChat = useRef(false);
 
   const [attachedFile, setAttachedFile] = useState<{ name: string, content: string } | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isMobile = useIsMobile();
+  const [showMobileHistory, setShowMobileHistory] = useState(false);
 
   const cleanupWebSocket = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -69,24 +79,7 @@ export function Interface() {
     }
   };
 
-  const initChatSession = async () => {
-    if (chatId) return chatId;
-    try {
-      const res = await authFetch('/api/v1/chat', {
-        method: 'POST',
-        body: JSON.stringify({ content: '' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.chat_id) {
-          return data.chat_id;
-        }
-      }
-    } catch (e) {
-      console.error("Failed to init chat session:", e);
-    }
-    return null;
-  };
+
 
   const deleteChat = async (idToDelete: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -124,6 +117,7 @@ export function Interface() {
         model: msg.model,
       }));
       setMessages(formattedMessages);
+      setShowMobileHistory(false);
     } catch (e) {
       console.error(e);
     }
@@ -134,6 +128,7 @@ export function Interface() {
     navigate('/interface');
     resetState();
     setChatId(null);
+    setShowMobileHistory(false);
   };
 
   useEffect(() => {
@@ -362,6 +357,348 @@ export function Interface() {
   };
 
   const isNewChat = messages.length === 0;
+
+  if (isMobile) {
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] w-full bg-background overflow-hidden text-foreground">
+        {/* Mobile Header */}
+        <header className="px-4 py-3 flex justify-between items-center bg-background/80 backdrop-blur-md sticky top-0 z-20 border-b border-border/40 shrink-0">
+          <button onClick={() => setShowMobileHistory(true)} className="p-2 -ml-2 text-muted-foreground hover:text-foreground active:scale-95 transition-transform">
+            <Menu className="h-6 w-6" />
+          </button>
+          <span className="font-medium text-lg tracking-tight">EduMind</span>
+          <button onClick={startNewChat} className="p-2 -mr-2 text-primary active:scale-95 transition-transform">
+            <Plus className="h-6 w-6" />
+          </button>
+        </header>
+
+        {/* History Drawer */}
+        <AnimatePresence>
+          {showMobileHistory && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowMobileHistory(false)}
+                className="absolute inset-0 bg-background/80 backdrop-blur-sm z-30"
+              />
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="absolute top-0 left-0 bottom-0 w-[55%] max-w-[320px] bg-card border-r border-border z-40 shadow-2xl flex flex-col"
+              >
+                <div className="p-4 border-b border-border bg-muted/30 flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">
+                    E
+                  </div>
+                  <span className="font-semibold text-lg">EduMind</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  <div className="space-y-1 mb-6 border-b border-border pb-4">
+                    <button
+                      onClick={() => navigate('/')}
+                      className="flex items-center w-full px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted/50 transition-all text-sm"
+                    >
+                      <Home className="h-5 w-5 mr-3" />
+                      <span className="font-medium">工作台</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/knowledgeBase')}
+                      className="flex items-center w-full px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted/50 transition-all text-sm"
+                    >
+                      <Database className="h-5 w-5 mr-3" />
+                      <span className="font-medium">知识库</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/interface')}
+                      className="flex items-center w-full px-4 py-3 rounded-xl bg-muted shadow-sm ring-1 ring-border font-medium text-foreground transition-all text-sm"
+                    >
+                      <MessageSquare className="h-5 w-5 mr-3" />
+                      <span className="font-medium">对话交互</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/brain')}
+                      className="flex items-center w-full px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted/50 transition-all text-sm"
+                    >
+                      <BrainCircuit className="h-5 w-5 mr-3" />
+                      <span className="font-medium">意图理解</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/factory')}
+                      className="flex items-center w-full px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted/50 transition-all text-sm"
+                    >
+                      <Layers className="h-5 w-5 mr-3" />
+                      <span className="font-medium">课件工厂</span>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={startNewChat}
+                    className="flex items-center w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground mb-4 shadow-sm active:scale-[0.98] transition-all"
+                  >
+                    <Plus className="h-5 w-5 mr-3" />
+                    <span className="font-medium">新对话</span>
+                  </button>
+
+                  <div className="text-xs font-medium text-muted-foreground px-2 py-2 uppercase tracking-wider opacity-70">最近对话</div>
+
+                  {history.length === 0 && (
+                    <div className="text-sm text-muted-foreground px-4 py-8 text-center bg-muted/30 rounded-xl border border-dashed border-border">暂无历史记录</div>
+                  )}
+
+                  {history.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className={`group flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-all ${chatId === chat.id ? 'bg-muted shadow-sm ring-1 ring-border font-medium text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
+                    >
+                      <button
+                        onClick={() => loadChat(chat.id)}
+                        className="flex-1 text-left truncate pr-2"
+                      >
+                        {chat.title}
+                      </button>
+                      <button
+                        onClick={(e) => deleteChat(chat.id, e)}
+                        className="p-2 -mr-2 text-muted-foreground/50 hover:text-destructive transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 border-t border-border space-y-2 mt-auto">
+                  <AnimatedThemeToggler
+                    className="flex items-center w-full px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted/50 transition-all text-sm"
+                  >
+                    {theme === 'dark' ? <Sun className="h-5 w-5 mr-3" /> : <Moon className="h-5 w-5 mr-3" />}
+                    <span className="font-medium">
+                      {theme === 'dark' ? '切换亮色' : '切换暗色'}
+                    </span>
+                  </AnimatedThemeToggler>
+
+                  <button
+                    onClick={logout}
+                    className="flex items-center w-full px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted/50 transition-all text-sm"
+                  >
+                    <LogOut className="h-5 w-5 mr-3" />
+                    <span className="font-medium">退出登录</span>
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Messages Area */}
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto px-4 py-4 space-y-6 custom-scrollbar scroll-smooth pb-32"
+        >
+          {/* Welcome Screen for Mobile */}
+          {isNewChat && (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-6 opacity-80">
+              <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center mb-2">
+                <Bot className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl font-medium mb-2">今天想聊些什么？</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-[240px] mx-auto">
+                  我可以帮您解答问题、提供建议或协助您完成任务。
+                </p>
+              </div>
+            </div>
+          )}
+
+          {messages.map((msg) => {
+            const { filename, cleanText } = msg.role === 'user' ? parseMessageContent(msg.content) : { filename: null, cleanText: msg.content };
+
+            return (
+              <SlideUp key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-1`}>
+                <div className={`flex items-end max-w-[90%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'} space-x-2`}>
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-muted-foreground'}`}>
+                    {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                  </div>
+
+                  <div className={`flex flex-col min-w-0 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div className={`px-4 py-3 rounded-2xl shadow-sm text-[15px] leading-relaxed break-words w-full ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-card border border-border text-card-foreground rounded-tl-sm'}`}>
+                      {filename && (
+                        <div className="flex items-center space-x-3 bg-primary-foreground/10 p-2.5 rounded-xl mb-2 border border-primary-foreground/10 backdrop-blur-sm">
+                          <div className="bg-primary-foreground/20 p-1.5 rounded-lg">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-[10px] opacity-70 mb-0.5">附件</span>
+                            <span className="text-xs font-medium truncate max-w-[120px]">{filename}</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="markdown-mobile">
+                        <StreamMarkdown content={cleanText} />
+                      </div>
+                    </div>
+                    {/* Time & Model info */}
+                    <div className="flex items-center space-x-2 mt-1 px-1">
+                      <span className="text-[10px] text-muted-foreground/60 font-medium">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </SlideUp>
+            );
+          })}
+
+          {/* Typing Indicator */}
+          {isTyping && (
+            <div className="flex justify-start items-end space-x-2 pl-1">
+              <div className="h-8 w-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center flex-shrink-0">
+                <Bot className="h-4 w-4" />
+              </div>
+              <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-tl-sm flex items-center space-x-2 shadow-sm">
+                {processingState === 'analyzing_intent' && (
+                  <>
+                    <BrainCircuit className="h-3 w-3 animate-pulse text-blue-500" />
+                    <span className="text-xs font-medium text-muted-foreground">思考中...</span>
+                  </>
+                )}
+                {processingState === 'retrieving_knowledge' && (
+                  <>
+                    <Database className="h-3 w-3 animate-pulse text-orange-500" />
+                    <span className="text-xs font-medium text-muted-foreground">查询中...</span>
+                  </>
+                )}
+                {processingState === 'reasoning' && (
+                  <>
+                    <Cpu className="h-3 w-3 animate-spin text-purple-600" />
+                    <span className="text-xs font-medium text-muted-foreground">推理中...</span>
+                  </>
+                )}
+                {processingState === 'summarizing' && (
+                  <>
+                    <Sparkles className="h-3 w-3 animate-pulse text-green-600" />
+                    <span className="text-xs font-medium text-muted-foreground">生成中...</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          <div ref={scrollRef} />
+        </div>
+
+        {/* Input Area - Fixed at bottom */}
+        <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-border/40 px-3 py-3 pb-[env(safe-area-inset-bottom)] z-20">
+          {attachedFile && (
+            <div className="flex items-center justify-between bg-muted/80 p-2.5 rounded-xl mb-3 border border-border/50 animate-in slide-in-from-bottom-2 fade-in">
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <FileText className="h-4 w-4 text-primary" />
+                <span className="text-xs font-medium truncate max-w-[200px]">{attachedFile.name}</span>
+              </div>
+              <button
+                onClick={() => setAttachedFile(null)}
+                className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-full transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex items-end space-x-2">
+            {/* Attachment Button */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileSelect}
+              accept=".pdf,.doc,.docx,.txt,.md"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingFile}
+              className="p-3 text-muted-foreground bg-secondary/50 hover:bg-secondary rounded-full transition-colors flex-shrink-0 active:scale-95"
+            >
+              {isUploadingFile ? (
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              ) : (
+                <Paperclip className="h-5 w-5" />
+              )}
+            </button>
+
+            {/* Text Input */}
+            <div className="flex-1 bg-secondary/30 border border-border/50 rounded-[24px] flex items-center px-4 py-2 min-h-[44px] focus-within:ring-1 focus-within:ring-primary/20 focus-within:bg-secondary/50 transition-all">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    handleSend();
+                  }
+                }}
+                placeholder="输入消息..."
+                className="flex-1 bg-transparent border-none outline-none text-[16px] placeholder:text-muted-foreground/50 text-foreground w-full py-1"
+              // text-[16px] prevents iOS zoom on focus
+              />
+
+              {/* Voice Input inside the bar or outside? Inside saves space */}
+              <div className="flex-shrink-0 ml-1">
+                <VoiceInput
+                  onTranscriptUpdate={(text, isFinal) => {
+                    if (isFinal) {
+                      const newMessage: Message = {
+                        id: generateId(),
+                        role: 'user',
+                        content: text,
+                        type: 'text',
+                        timestamp: new Date().toISOString()
+                      };
+                      setMessages(prev => [...prev, newMessage]);
+                      setIsTyping(true);
+                      setProcessingState('summarizing');
+                    } else {
+                      setInput(text);
+                    }
+                  }}
+                  onLLMMessage={(text, isFinal) => {
+                    setMessages(prev => {
+                      const lastMsg = prev[prev.length - 1];
+                      const isLastAssistant = lastMsg?.role === 'assistant';
+
+                      if (isFinal) {
+                        setIsTyping(false);
+                        setProcessingState('idle');
+                        if (isLastAssistant) {
+                          return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: text } : msg);
+                        }
+                        return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
+                      }
+                      if (isLastAssistant) {
+                        return prev.map((msg, idx) => idx === prev.length - 1 ? { ...msg, content: msg.content + text } : msg);
+                      }
+                      return [...prev, { id: generateId(), role: 'assistant', content: text, type: 'text', timestamp: new Date().toISOString(), model: 'kimi-k2.5' }];
+                    });
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={handleSend}
+              disabled={(!input.trim() && !attachedFile) || isUploadingFile}
+              className={`p-3 rounded-full transition-all flex-shrink-0 shadow-sm active:scale-95 ${(!input.trim() && !attachedFile) ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
+            >
+              <Send className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   return (
     <div className="flex h-full w-full">

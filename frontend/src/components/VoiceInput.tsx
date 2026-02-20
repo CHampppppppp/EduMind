@@ -215,6 +215,8 @@ export function VoiceInput({ onTranscriptUpdate, onLLMMessage, onRecordingStart 
         {isRecording ? <Square className="h-5 w-5 z-10" /> : <Mic className="h-5 w-5 z-10" />}
       </button>
 
+      {/* Hidden status for debug */}
+      <span className="hidden">{status}</span>
     </div>
   );
 }

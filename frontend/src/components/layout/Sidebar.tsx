@@ -19,7 +19,7 @@ const navItems = [
 
 
 export function Sidebar({ logout }: SidebarProps) {
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <aside className="fixed left-0 top-0 z-30 h-screen w-20 flex flex-col items-center py-8 glass border-r border-border transition-all duration-300 hover:w-48 group overflow-hidden">
